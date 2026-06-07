@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>油屋町川船 囃子練習アプリ</title>
+    <style>
+        body {
+            margin: 0; padding: 0; background-color: #1a1a1a; color: white;
+            font-family: sans-serif; user-select: none; -webkit-user-select: none;
+            overflow-x: hidden;
+        }
+        .screen {
+            display: none; width: 100vw; min-height: 100vh;
+            flex-direction: column; align-items: center; justify-content: center;
+            box-sizing: border-box; padding: 20px;
+        }
+        .active { display: flex; }
+        .hide-btn { display: none !important; }
+        /* 📱 縦画面でお稽古に集中できるよう、ゲーム画面はスクロール禁止でぴったり固定 */
+        #screenGame {
+            height: 100vh; height: -webkit-fill-available;
+            overflow: hidden; position: fixed; top: 0; left: 0; padding: 0;
+        }
+
+        h1, h2 { margin-top: 10px; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.6); text-align: center; }
+        
+        .btn {
+            width: 80%; max-width: 300px; padding: 15px 20px; margin: 10px 0;
+            font-size: 18px; font-weight: bold; text-align: center;
+            background: #d9534f; border: 2px solid #fff; border-radius: 30px;
+            color: white; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .btn:active { transform: scale(0.98); opacity: 0.9; }
+        .btn-blue { background: #337ab7; }
+        .btn-gold { background: #f0ad4e; }
+        .btn-disabled { background: #555 !important; border-color: #888; cursor: not-allowed; }
+
+        .form-group { width: 80%; max-width: 300px; margin-bottom: 15px; display: flex; flex-direction: column; }
+        .form-group label { font-size: 14px; margin-bottom: 5px; color: #ccc; }
+        .form-group input { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #fff; background: #333; color: white; }
+
+        /* --- 縦向き画面用の三等分レイアウト調整 --- */
+        #gameTopArea { width: 100vw; height: 38vh; display: flex; justify-content: center; align-items: center; background: #111; position: relative; }
+        #gameCanvas { display: block; background: #222; width: 100vw; height: 22vh; }
+        #controls { display: flex; width: 100vw; height: 40vh; } /* ボタンを押しやすくするため下部を広めに */
+        
+        .hit-btn {
+            flex: 1; border: none; color: white;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer;
+            box-sizing: border-box; border-right: 1px solid #222;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .hit-btn-title { font-size: 36px; font-weight: bold; margin-bottom: 4px; }
+        .hit-btn-sub { font-size: 14px; opacity: 0.7; font-weight: normal; }
+
+        #btnLeft { background-color: #337ab7; }
+        #btnDon  { background-color: #d9534f; }
+        #btnRight{ background-color: #2eb82e; }
+        .hit-btn:active { opacity: 0.6; }
+        
+        #infoOverlay {
+            position: absolute; top: 12px; left: 12px; font-size: 14px;
+            background: rgba(0,0,0,0.7); padding: 6px 10px; border-radius: 5px; z-index: 5;
+        }
+
+        .kane-part { fill: #998040; stroke: #fff; stroke-width: 2; transition: fill 0.1s ease; }
+        .kane-active { fill: #ffdf00 !important; filter: drop-shadow(0px 0px 15px #ffdf00); }
+        .kane-center { fill: #b3974e; stroke: #fff; stroke-width: 2; transition: fill 0.1s ease; }
+        .taiko-part {
+            transition: fill 0.05s ease;
+        }
+        /* 太鼓の左/右が光ったときの色（不透明度0.5の朱色・オレンジ系） */
+        .taiko-active {
+            fill: rgba(217, 83, 79, 0.5) !important;
+        }
+        #userStatus { font-size: 14px; margin-bottom: 20px; color: #ccc; }
+        #historyList { width: 100%; max-width: 400px; max-height: 180px; overflow-y: auto; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 10px; }
+        .history-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #444; font-size: 14px; }
+    </style>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBig-3vYGSB1s2tDzDceJMUkrm4Ir8kJVY",
+            authDomain: "aburaya.firebaseapp.com",
+            projectId: "aburaya",
+            storageBucket: "aburaya.firebasestorage.app",
+            messagingSenderId: "601080015473",
+            appId: "1:601080015473:web:795bfb90a56ed7dd4689d0"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.handleLogin = () => {
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            signInWithEmailAndPassword(auth, email, password)
+                .then(() => { alert("ログインしました！"); window.nextScreen('screenMenu'); })
+                .catch(() => { alert("ログインに失敗しました。"); });
+        };
+        window.logout = () => { signOut(auth).then(() => alert("ログアウトしました")); };
+
+        onAuthStateChanged(auth, (user) => {
+            const gotoLoginBtn = document.getElementById('gotoLoginBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const myPageBtn = document.getElementById('myPageBtn');
+            const userStatus = document.getElementById('userStatus');
+            if (user) {
+                window.currentUser = user;
+                userStatus.innerText = `お稽古中: ${user.email.split('@')[0]} さん`;
+                gotoLoginBtn.style.display = "none"; logoutBtn.style.display = "block"; myPageBtn.classList.remove('btn-disabled');
+            } else {
+                window.currentUser = null; userStatus.innerText = "ゲストモード（スコアは保存されません）";
+                gotoLoginBtn.style.display = "block"; logoutBtn.style.display = "none"; myPageBtn.classList.add('btn-disabled');
+            }
+        });
+
+        window.saveScoreToFirebase = async (gakki, kyoku, level, score, ryo, ka) => {
+            if (!window.currentUser) return;
+            try {
+                await addDoc(collection(db, "scores"), {
+                    uid: window.currentUser.uid, 
+                    userEmail: window.currentUser.email,
+                    gakki: gakki, 
+                    kyoku: kyoku, 
+                    level: level, // 👈 新しくレベルを保存
+                    score: score, 
+                    ryo: ryo, 
+                    ka: ka, 
+                    timestamp: new Date() // 日時はここで自動保存されています
+                });
+            } catch (e) { console.error(e); }
+        };
+
+        window.loadHistory = async () => {
+            if (!window.currentUser) return;
+            const listDiv = document.getElementById('historyList'); 
+            listDiv.innerHTML = "読み込み中...";
+            
+            const q = query(collection(db, "scores"), where("uid", "==", window.currentUser.uid), orderBy("timestamp", "desc"), limit(10));
+            const querySnapshot = await getDocs(q); 
+            listDiv.innerHTML = "";
+            
+            if(querySnapshot.empty) { 
+                listDiv.innerHTML = "まだ履歴がありません。"; 
+                return;
+            }
+            
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                
+                // 📅 タイムスタンプを「◯月◯日 ◯:◯」の形式に変換する処理
+                let dateStr = "";
+                if (data.timestamp) {
+                    const date = data.timestamp.toDate(); // Firebaseの時間をJSの日付に変換
+                    const month = date.getMonth() + 1;
+                    const day = date.getDate();
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    dateStr = `${month}/${day} ${hours}:${minutes}`;
+                }
+
+                // 🔰 レベルの表示テキストを設定（データがなければ「1」にする）
+                const displayLevel = data.level ? `Lv.${data.level}` : "Lv.1";
+
+                const item = document.createElement('div'); 
+                item.className = "history-item";
+                
+                // 📄 画面に表示するHTML（日時、曲名、楽器、レベル、点数）
+                item.innerHTML = `
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-size: 11px; color: #aaa;">${dateStr}</span>
+                        <span>${data.kyoku} (${data.gakki}) <span style="color: #f0ad4e; font-size: 12px;">${displayLevel}</span></span>
+                    </div>
+                    <strong style="align-self: center;">${data.score}点</strong>
+                `;
+                listDiv.appendChild(item);
+            });
+        };
+    </script>
+</head>
+<body>
+    
+    <div id="screenMenu" class="screen active">
+        <h1>🏮 油屋町 囃子稽古アプリ 🏮</h1>
+        <div id="userStatus">読み込み中...</div>
+        <button class="btn" onclick="nextScreen('screenGakki')">稽古を始める</button>
+        <button id="myPageBtn" class="btn btn-blue btn-disabled" onclick="if(window.currentUser){ nextScreen('screenHistory'); window.loadHistory(); }">マイページ (履歴)</button>
+        <button id="gotoLoginBtn" class="btn btn-gold" onclick="nextScreen('screenAuth')">ログイン画面へ</button>
+        <button id="logoutBtn" class="btn" style="background:#555; display:none;" onclick="window.logout()">ログアウト</button>
+    </div>
+
+    <div id="screenAuth" class="screen">
+        <h2>ログイン</h2>
+        <div class="form-group">
+            <label>お稽古用ID</label>
+            <input type="email" id="authEmail" placeholder="taro@hayashi.com">
+        </div>
+        <div class="form-group">
+            <label>パスワード</label>
+            <input type="password" id="authPassword" placeholder="******">
+        </div>
+        <button class="btn btn-blue" onclick="window.handleLogin()">ログインする</button>
+        <button class="btn" style="background:#555;" onclick="nextScreen('screenMenu')">戻る</button>
+    </div>
+
+    <div id="screenHistory" class="screen">
+        <h2>過去の稽古履歴 (最新10件)</h2>
+        <div id="historyList"></div>
+        <button class="btn" style="background:#555;" onclick="nextScreen('screenMenu')">メニューに戻る</button>
+    </div>
+
+    <div id="screenGakki" class="screen">
+        <h2>どの楽器を練習しますか？</h2>
+        <button class="btn" onclick="selectGakki('大太鼓')">🥁 大太鼓</button>
+        <button class="btn btn-blue" onclick="selectGakki('〆太鼓')">🪘 〆太鼓</button>
+        <button class="btn btn-gold" onclick="selectGakki('小鉦・大鉦')">🔔 小鉦・大鉦</button>
+        <button class="btn" style="background:#555;" onclick="nextScreen('screenMenu')">戻る</button>
+    </div>
+
+    <div id="screenKyoku" class="screen">
+        <h2>曲を選んでください</h2>
+        <div id="kyokuList" style="width: 100%; display: flex; flex-direction: column; align-items: center;"></div>
+        <button class="btn" style="background:#555;" onclick="nextScreen('screenGakki')">戻る</button>
+    </div>
+
+    <div id="screenLevel" class="screen">
+        <h2>稽古の難易度</h2>
+        <button class="btn btn-blue" onclick="selectLevel(1)">🔰 かんたん（色あり）</button>
+        <button class="btn btn-gold" onclick="selectLevel(2)">🔥 ふつう（色なし）</button>
+        <button class="btn" style="background: #d9534f;" onclick="selectLevel(3)">👹 おに</button>
+        <button class="btn" style="background:#555;" onclick="nextScreen('screenKyoku')">戻る</button>
+    </div>
+
+    <div id="screenGame" class="screen">
+        <div id="gameTopArea">
+            <div id="infoOverlay">
+                <span id="txtGakki"></span> - <span id="txtKyoku"></span> (<span id="txtLevel"></span>)<br>
+                <span>得点: <span id="txtScore">100.0</span> 点</span>
+            </div>
+            
+            <button onclick="window.abortGame()" style="position: absolute; top: 12px; right: 12px; background: rgba(217,83,79,0.8); color: white; border: 1px solid white; padding: 6px 12px; border-radius: 5px; font-weight: bold; z-index: 10; cursor: pointer;">
+                中断
+            </button>
+                
+            <svg id="kaneSvg" width="180" height="180" viewBox="0 0 200 200" style="overflow: visible;">
+                <defs>
+                    <clipPath id="circleClip">
+                        <circle cx="100" cy="100" r="85" />
+                    </clipPath>
+                </defs>
+
+                <circle cx="100" cy="100" r="90" fill="#443518" stroke="#665226" stroke-width="4"/>
+                <circle cx="100" cy="100" r="85" fill="#806b35" />
+
+                <g clip-path="url(#circleClip)">
+                    <path id="kanePart2" class="kane-part" d="M 100,100 L 0,0 A 130,130 0 0,0 0,200 Z" />
+                    <path id="kanePart3" class="kane-part" d="M 100,100 L 200,0 A 130,130 0 0,1 200,200 Z" />
+                    
+                    <line x1="100" y1="100" x2="100" y2="15" stroke="#fff" stroke-width="1.5" opacity="0.5" />
+                    <line x1="100" y1="100" x2="100" y2="185" stroke="#fff" stroke-width="1.5" opacity="0.5" />
+                </g>
+
+                <circle id="kanePart1" class="kane-center" cx="100" cy="100" r="38" />
+                <circle cx="100" cy="100" r="10" fill="#443518" />
+                <circle cx="100" cy="100" r="8" fill="#5c4921" />
+            </svg>
+            <svg id="taikoSvg" width="180" height="180" viewBox="0 0 200 200" style="overflow: visible; display: none;">
+        <defs>
+            <!-- 太鼓の丸い形状に切り抜く -->
+            <clipPath id="taikoClip">
+                <circle cx="100" cy="100" r="80" />
+            </clipPath>
+        </defs>
+        <!-- 太鼓の胴（茶色いフチ） -->
+        <circle cx="100" cy="100" r="86" fill="#8B4513" stroke="#5c2e0b" stroke-width="4"/>
+        <!-- 太鼓の面（本来の革の色） -->
+        <circle cx="100" cy="100" r="80" fill="#fcf3db" />
+        
+        <!-- 左右の打面パーツ（叩くとここに taiko-active クラスがついて光る） -->
+        <g clip-path="url(#taikoClip)">
+            <!-- 左半分 (type: 2) -->
+            <path id="taikoPart2" class="taiko-part" d="M 100,0 A 80,80 0 0,0 100,200 Z" fill="transparent" transition="fill 0.1s" />
+            <!-- 右半分 (type: 3) -->
+            <path id="taikoPart3" class="taiko-part" d="M 100,0 A 80,80 0 0,1 100,200 Z" fill="transparent" transition="fill 0.1s" />
+            <!-- 中心線（うっすら見える境界線） -->
+            <line x1="100" y1="0" x2="100" y2="200" stroke="#8B4513" stroke-width="2" opacity="0.2" stroke-dasharray="4" />
+        </g>
+        <!-- 太鼓の巴紋や中心の雰囲気用の飾り円 -->
+        <circle cx="100" cy="100" r="15" fill="none" stroke="#8B4513" stroke-width="2" opacity="0.3" />
+    </svg>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="controls">
+            <div id="btnLeft" class="hit-btn">
+                <span class="hit-btn-title">左</span>
+                <span class="hit-btn-sub">2 / D</span>
+            </div>
+            <div id="btnDon" class="hit-btn">
+                <span class="hit-btn-title">中</span>
+                <span class="hit-btn-sub">1 / F</span>
+            </div>
+            <div id="btnRight" class="hit-btn">
+                <span class="hit-btn-title">右</span>
+                <span class="hit-btn-sub">3 / J</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="screenResult" class="screen">
+        <h2>お稽古終了！</h2>
+        <h1 id="resScore" style="color:#f0ad4e; font-size: 48px;">100.0 点</h1>
+        <div style="font-size: 20px; margin-bottom: 30px;">
+            良: <span id="resRyo" style="color:#d9534f; font-weight:bold;">0</span> 回 / 
+            可: <span id="resKa" style="color:#337ab7; font-weight:bold;">0</span> 回
+        </div>
+        <!-- 💡 戻るときに「中」ボタンの非表示クラスを解除するように修正 -->
+        <button class="btn" onclick="document.getElementById('btnDon').classList.remove('hide-btn'); nextScreen('screenMenu');">メニューに戻る</button>
+    </div>
+
+<script>
+// --- ⚙️ 楽譜・音声設定データベース ⚙️ ---
+const kyokuMasta = ["道行き", "はしり・まわし", "網打ち", "根曳唄"];
+
+const bgmUrls = {
+    "道行き": "audio/michiyuki.mp3", 
+    "はしり・まわし": "audio/hashirimawashi.mp3", 
+    "根曳唄": "audio/nebikiuta.mp3", 
+    "網打ち": "audio/amiuchi.mp3" 
+   // "網待ち": "audio/amimachi.m4a", 
+   // "打ち込み": "audio/uchikomi.m4a",
+    //"庭先き": "audio/niwasaki.m4a"
+};
+
+const hayashiScores = {
+    "道行き": { "大太鼓": [], "〆太鼓": [], "小鉦・大鉦": [] },
+   
+    "はしり・まわし": { 
+    "大太鼓": [
+        { time: 8.390310, type: 3 }, { time: 8.617067, type: 2 }, { time: 8.889176, type: 3 },
+
+       
+        { time: 10.612532, type: 3 }, { time: 10.884641, type: 2 }, { time: 11.156749, type: 3 },
+        
+        { time: 12.834754, type: 3 }, { time: 13.106863, type: 2 }, { time: 13.378972, type: 3 },
+        
+        { time: 15.056976, type: 3 }, { time: 15.329085, type: 2 }, { time: 15.601194, type: 3 },
+        
+        { time: 17.143144, type: 3 }, { time: 17.460604, type: 2 }, { time: 17.778065, type: 3 },
+        { time: 18.231579, type: 3 }, { time: 18.503688, type: 2 }, { time: 18.775797, type: 3 },
+        
+        { time: 19.818881, type: 3 }, 
+        { time: 21.406183, type: 3 }, { time: 21.587588, type: 2 },{ time: 21.905049, type: 3 },
+        
+        { time: 22.993484, type: 3 }, 
+        { time: 24.580786, type: 3 }, { time: 24.762192, type: 2 },{ time: 25.034300, type: 3 },
+        
+        { time: 26.122736, type: 3 }, 
+        { time: 27.664686, type: 3 }, { time: 27.891443, type: 2 },{ time: 28.163552, type: 3 },
+        
+        { time: 29.251988, type: 3 }, 
+        { time: 30.748586, type: 3 }, { time: 30.975344, type: 2 },{ time: 31.247452, type: 3 },
+        { time: 31.746, type: 3 }, { time: 31.928, type: 2 },{ time: 32.245185, type: 3 },
+
+        { time: 33.787135, type: 3 }, { time: 34.013892, type: 2 }, { time: 34.286001, type: 3 },
+
+        { time: 35.782600, type: 3 }, { time: 36.054709, type: 2 }, { time: 36.326817, type: 3 },
+
+        { time: 37.868768, type: 3 }, { time: 38.095525, type: 2 }, { time: 38.367634, type: 3 },
+
+        { time: 39.909584, type: 3 }, { time: 40.181693, type: 2 }, { time: 40.408450, type: 3 },
+
+        { time: 41.859697, type: 3 }, { time: 42.222509, type: 2 }, { time: 42.494618, type: 3 },
+
+        { time: 42.993484, type: 3 }, { time: 43.492350, type: 2 }, { time: 44.263325, type: 3 },
+
+        { time: 46.349493, type: 3 }, 
+        { time: 49.115933, type: 3 }, { time: 50.113666, type: 2 }, { time: 50.975344, type: 3 }
+         ], 
+    "〆太鼓":  [
+        { time: 8.390310, type: 3 }, { time: 8.617067, type: 2 }, { time: 8.889176, type: 3 },
+
+        { time: 9.478745, type: 3 }, { time: 9.750854, type: 2 }, { time: 10.068314, type: 3 },
+        { time: 10.612532, type: 3 }, { time: 10.884641, type: 2 }, { time: 11.156749, type: 3 },
+        
+        { time: 11.746319, type: 3 }, { time: 12.018427, type: 2 }, { time: 12.335888, type: 3 },
+        { time: 12.834754, type: 3 }, { time: 13.106863, type: 2 }, { time: 13.378972, type: 3 },
+        
+        { time: 13.968541, type: 3 }, { time: 14.240650, type: 2 }, { time: 14.558110, type: 3 },
+        { time: 15.056976, type: 3 }, { time: 15.329085, type: 2 }, { time: 15.601194, type: 3 },
+        
+        { time: 16.100060, type: 3 }, { time: 16.417520, type: 2 }, { time: 16.644278, type: 3 },
+        { time: 17.143144, type: 3 }, { time: 17.460604, type: 2 }, { time: 17.778065, type: 3 },
+
+        { time: 18.231579, type: 3 }, { time: 18.503688, type: 2 }, { time: 18.775797, type: 3 },
+        
+        { time: 19.818881, type: 3 }, { time: 20.408450, type: 3 }, { time: 20.635208, type: 2 }, { time: 20.907316, type: 3 },
+        { time: 21.406183, type: 3 }, { time: 21.587588, type: 2 },{ time: 21.905049, type: 3 },
+        
+        { time: 22.993484, type: 3 }, { time: 23.537702, type: 3 }, { time: 23.764459, type: 2 }, { time: 24.036568, type: 3 },
+        { time: 24.580786, type: 3 }, { time: 24.762192, type: 2 },{ time: 25.034300, type: 3 },
+        
+        { time: 26.122736, type: 3 }, { time: 26.666954, type: 3 }, { time: 26.893711, type: 2 }, { time: 27.165820, type: 3 },
+        { time: 27.664686, type: 3 }, { time: 27.891443, type: 2 },{ time: 28.163552, type: 3 },
+        
+        { time: 29.251988, type: 3 }, { time: 29.796205, type: 3 }, { time: 29.977611, type: 2 }, { time: 30.249720, type: 3 },
+        { time: 30.748586, type: 3 }, { time: 30.975344, type: 2 },{ time: 31.247452, type: 3 },
+        
+        
+        { time: 32.245185, type: 3 }, 
+        { time: 32.744051, type: 3 }, { time: 33.016160, type: 2 }, { time: 33.288269, type: 3 },
+        { time: 33.787135, type: 3 }, { time: 34.013892, type: 2 }, { time: 34.286001, type: 3 },
+
+        { time: 34.784867, type: 3 }, { time: 35.011625, type: 2 }, { time: 35.329085, type: 3 },
+        { time: 35.782600, type: 3 }, { time: 36.054709, type: 2 }, { time: 36.326817, type: 3 },
+
+        { time: 36.825684, type: 3 }, { time: 37.052441, type: 2 }, { time: 37.369901, type: 3 },
+        { time: 37.868768, type: 3 }, { time: 38.095525, type: 2 }, { time: 38.367634, type: 3 },
+
+        { time: 38.866500, type: 3 }, { time: 39.093257, type: 2 }, { time: 39.410718, type: 3 },
+        { time: 39.909584, type: 3 }, { time: 40.181693, type: 2 }, { time: 40.408450, type: 3 },
+
+        { time: 40.907316, type: 3 }, { time: 41.179425, type: 2 }, { time: 41.406183, type: 3 },
+        { time: 41.859697, type: 3 }, { time: 42.222509, type: 2 }, { time: 42.494618, type: 3 },
+
+        { time: 42.993484, type: 3 }, { time: 43.492350, type: 2 }, { time: 44.263325, type: 3 },
+
+        { time: 46.349493, type: 3 }, 
+        { time: 47.301874, type: 3 }, { time: 47.664686, type: 2 }, { time: 48.163552, type: 3 },
+        { time: 49.115933, type: 3 }, { time: 50.113666, type: 2 }, { time: 50.975344, type: 3 },
+    
+        { time: 53.016160, type: 3 }, { time: 53.877838, type: 2 }, { time: 54.830219, type: 3 }, 
+        { time: 56.689629, type: 3 }, { time: 57.823416, type: 2 }, { time: 58.685094, type: 3 }
+    ], 
+    "小鉦・大鉦": [
+    { time: 8.390310, type: 2 }, { time: 8.617067, type: 3 }, { time: 8.889176, type: 2 },
+
+    { time: 9.478745, type: 2 }, { time: 9.750854, type: 3 }, { time: 10.068314, type: 2 },
+    { time: 10.612532, type: 2 }, { time: 10.884641, type: 3 }, { time: 11.156749, type: 2 },
+    
+    { time: 11.746319, type: 2 }, { time: 12.018427, type: 3 }, { time: 12.335888, type: 2 },
+    { time: 12.834754, type: 2 }, { time: 13.106863, type: 3 }, { time: 13.378972, type: 2 },
+    
+    { time: 13.968541, type: 2 }, { time: 14.240650, type: 3 }, { time: 14.558110, type: 2 },
+    { time: 15.056976, type: 2 }, { time: 15.329085, type: 3 }, { time: 15.601194, type: 2 },
+    
+    { time: 16.100060, type: 2 }, { time: 16.417520, type: 3 }, { time: 16.644278, type: 2 },
+    { time: 17.143144, type: 2 }, { time: 17.460604, type: 3 }, { time: 17.778065, type: 2 },
+
+    { time: 18.231579, type: 2 }, { time: 18.503688, type: 3 }, { time: 18.775797, type: 2 },
+    
+    { time: 19.818881, type: 1 }, { time: 20.408450, type: 2 }, { time: 20.635208, type: 3 }, { time: 20.907316, type: 2 },
+    { time: 21.406183, type: 1 }, { time: 21.905049, type: 1 },
+    
+    { time: 22.993484, type: 1 }, { time: 23.537702, type: 2 }, { time: 23.764459, type: 3 }, { time: 24.036568, type: 2 },
+    { time: 24.580786, type: 1 }, { time: 25.034300, type: 1 },
+    
+    { time: 26.122736, type: 1 }, { time: 26.666954, type: 2 }, { time: 26.893711, type: 3 }, { time: 27.165820, type: 2 },
+    { time: 27.664686, type: 1 }, { time: 28.163552, type: 1 },
+    
+    { time: 29.251988, type: 1 }, { time: 29.796205, type: 2 }, { time: 29.977611, type: 3 }, { time: 30.249720, type: 2 },
+    { time: 30.748586, type: 1 }, { time: 31.247452, type: 1 },
+    
+    
+    { time: 32.245185, type: 1 }, 
+    { time: 32.744051, type: 2 }, { time: 33.016160, type: 3 }, { time: 33.288269, type: 2 },
+    { time: 33.787135, type: 2 }, { time: 34.013892, type: 3 }, { time: 34.286001, type: 2 },
+
+    { time: 34.784867, type: 2 }, { time: 35.011625, type: 3 }, { time: 35.329085, type: 2 },
+    { time: 35.782600, type: 2 }, { time: 36.054709, type: 3 }, { time: 36.326817, type: 2 },
+
+    { time: 36.825684, type: 2 }, { time: 37.052441, type: 3 }, { time: 37.369901, type: 2 },
+    { time: 37.868768, type: 2 }, { time: 38.095525, type: 3 }, { time: 38.367634, type: 2 },
+
+    { time: 38.866500, type: 2 }, { time: 39.093257, type: 3 }, { time: 39.410718, type: 2 },
+    { time: 39.909584, type: 2 }, { time: 40.181693, type: 3 }, { time: 40.408450, type: 2 },
+
+    { time: 40.907316, type: 2 }, { time: 41.179425, type: 3 }, { time: 41.406183, type: 2 },
+    { time: 41.859697, type: 2 }, { time: 42.222509, type: 3 }, { time: 42.494618, type: 2 },
+
+    { time: 42.993484, type: 2 }, { time: 43.492350, type: 3 }, { time: 44.263325, type: 2 },
+
+    { time: 46.349493, type: 1 }, 
+    { time: 47.301874, type: 2 }, { time: 47.664686, type: 3 }, { time: 48.163552, type: 2 },
+    { time: 49.115933, type: 2 }, { time: 50.113666, type: 3 }, { time: 50.975344, type: 2 },
+ 
+    { time: 53.016160, type: 2 }, { time: 53.877838, type: 3 }, { time: 54.830219, type: 2 }, 
+    { time: 56.689629, type: 2 }, { time: 57.823416, type: 3 }, { time: 58.685094, type: 2 }
+    ] 
+},
+    "網打ち": { 
+        "大太鼓": 
+        [
+            { time: 7.891156, type: 3 }, { time: 8.798186, type: 2 }, { time: 9.841270, type: 3 }, 
+           { time: 16.643991, type: 3 }, { time: 17.551020, type: 2 },
+            { time: 20.408163, type: 3 }, 
+            { time: 24.126984, type: 3 }, { time: 25.124717, type: 2 }, 
+            
+            { time: 27.891156, type: 3 }, 
+            
+            { time: 34.557823, type: 3 }, { time: 35.510204, type: 2 }, 
+            
+            { time: 42.086168, type: 3 }, { time: 42.993197, type: 2 }, 
+            { time: 44.897959, type: 3 }, 
+            { time: 47.664399, type: 3 }, { time: 48.707483, type: 2 }, { time: 49.614512, type: 3 }
+        ], 
+    "〆太鼓": [
+            { time: 7.891156, type: 3 }, { time: 8.798186, type: 2 }, { time: 9.841270, type: 3 }, 
+            { time: 10.839002, type: 3 }, { time: 11.247166, type: 2 }, { time: 11.791383, type: 3 },
+            { time: 12.879819, type: 3 }, { time: 13.333333, type: 2 }, { time: 13.786848, type: 3 },
+            { time: 14.739229, type: 3 }, { time: 15.238095, type: 2 }, { time: 15.691610, type: 3 },
+            { time: 16.643991, type: 3 }, { time: 17.551020, type: 2 },
+            { time: 20.408163, type: 3 }, { time: 21.269841, type: 3 }, { time: 21.814059, type: 2 }, { time: 22.312925, type: 3 },
+            { time: 24.126984, type: 3 }, { time: 25.124717, type: 2 }, 
+            { time: 25.941043, type: 3 }, { time: 26.439909, type: 2 }, { time: 26.938776, type: 3 }, 
+            { time: 27.891156, type: 3 }, { time: 28.662132, type: 3 }, { time: 29.115646, type: 2 }, { time: 29.569161, type: 3 },
+            { time: 31.519274, type: 3 }, { time: 32.108844, type: 2 }, { time: 32.653061, type: 3 }, { time: 33.106576, type: 2 }, { time: 33.605442, type: 3 },
+            { time: 34.557823, type: 3 }, { time: 35.510204, type: 2 }, 
+            { time: 39.229025, type: 3 }, { time: 39.727891, type: 2 }, { time: 40.226757, type: 3 }, { time: 40.680272, type: 2 }, { time: 41.133787, type: 3 },
+            { time: 42.086168, type: 3 }, { time: 42.993197, type: 2 }, 
+            { time: 44.897959, type: 3 }, { time: 45.850340, type: 3 }, { time: 46.258503, type: 2 }, { time: 46.757370, type: 3 },
+            { time: 47.664399, type: 3 }, { time: 48.707483, type: 2 }, { time: 49.614512, type: 3 }
+        ] , 
+    "小鉦・大鉦": [
+            { time: 7.891156, type: 1 }, { time: 8.798186, type: 1 }, { time: 9.841270, type: 1 }, 
+            { time: 10.839002, type: 2 }, { time: 11.247166, type: 3 }, { time: 11.791383, type: 2 },
+            { time: 12.879819, type: 2 }, { time: 13.333333, type: 3 }, { time: 13.786848, type: 2 },
+            { time: 14.739229, type: 2 }, { time: 15.238095, type: 3 }, { time: 15.691610, type: 2 },
+            { time: 16.643991, type: 1 }, { time: 17.551020, type: 1 },
+            { time: 20.408163, type: 1 }, { time: 21.269841, type: 2 }, { time: 21.814059, type: 3 }, { time: 22.312925, type: 2 },
+            { time: 24.126984, type: 1 }, { time: 25.124717, type: 1 }, 
+            { time: 25.941043, type: 2 }, { time: 26.439909, type: 3 }, { time: 26.938776, type: 2 }, 
+            { time: 27.891156, type: 1 }, { time: 28.662132, type: 2 }, { time: 29.115646, type: 3 }, { time: 29.569161, type: 2 },
+            { time: 31.519274, type: 2 }, { time: 32.108844, type: 3 }, { time: 32.653061, type: 2 }, { time: 33.106576, type: 3 }, { time: 33.605442, type: 2 },
+            { time: 34.557823, type: 1 }, { time: 35.510204, type: 1 }, 
+            { time: 39.229025, type: 2 }, { time: 39.727891, type: 3 }, { time: 40.226757, type: 2 }, { time: 40.680272, type: 3 }, { time: 41.133787, type: 2 },
+            { time: 42.086168, type: 1 }, { time: 42.993197, type: 1 }, 
+            { time: 44.897959, type: 1 }, { time: 45.850340, type: 2 }, { time: 46.258503, type: 3 }, { time: 46.757370, type: 2 },
+            { time: 47.664399, type: 2 }, { time: 48.707483, type: 3 }, { time: 49.614512, type: 2 }
+        ] 
+    },
+    "根曳唄": {
+        "大太鼓": [
+            { time: 8.545737, type: 3 }, { time: 9.588821, type: 2 },  { time: 10.631905, type: 3 },
+            { time: 20.110363, type: 3 }, { time: 21.062744, type: 2 },{ time: 22.060476, type: 3 },
+            { time: 24.010590, type: 3 }, { time: 25.824649, type: 2 },
+            { time: 31.538934, type: 3 }, { time: 32.468639, type: 2 },  { time: 33.398345, type: 3 },
+            { time: 36.935760, type: 3 },
+            { time: 40.473175, type: 3 }, { time: 41.334853, type: 2 }, { time: 42.241882, type: 3 },
+            { time: 44.146644, type: 3 }, 
+            { time: 47.910816, type: 3 }, { time: 48.863197, type: 2 }, { time: 49.815578, type: 3 }
+        ], 
+        "〆太鼓": [
+            { time: 8.545737, type: 3 }, { time: 9.588821, type: 3 }, { time: 10.087687, type: 2 }, { time: 10.631905, type: 3 },
+            { time: 12.536667, type: 3 }, { time: 13.534399, type: 2 }, { time: 14.441429, type: 3 },
+            { time: 16.436893, type: 3 }, { time: 17.298571,type: 2 }, { time: 18.250952, type: 3 },
+            { time: 20.110363, type: 3 }, { time: 21.062744, type: 3 }, { time: 21.561610, type: 2 }, { time: 22.060476, type: 3 },
+            { time: 24.010590, type: 3 }, { time: 25.824649, type: 2 },
+            { time: 27.729410, type: 3 }, { time: 28.727143, type: 3 }, { time: 29.180658, type: 2 }, { time: 29.634172, type: 3 },
+            { time: 31.538934, type: 3 },
+            { time: 33.398345, type: 3 }, { time: 34.305374, type: 2 }, { time: 35.167052, type: 3 },
+            { time: 36.935760, type: 3 }, { time: 37.888141, type: 3 }, { time: 38.341655, type: 2 }, { time: 38.749819, type: 3 },
+            { time: 40.473175, type: 3 }, { time: 41.334853, type: 2 }, { time: 42.241882, type: 3 },
+            { time: 44.146644, type: 3 }, { time: 45.053673, type: 3 }, { time: 45.507188, type: 2 }, { time: 45.915351, type: 3 },
+            { time: 47.910816, type: 3 }, { time: 48.863197, type: 2 }, { time: 49.815578, type: 3 }
+        ], 
+        "小鉦・大鉦": [
+            { time: 8.545737, type: 1 }, { time: 9.588821, type: 2 }, { time: 10.087687, type: 3 }, { time: 10.631905, type: 2 },
+            { time: 12.536667, type: 2 }, { time: 13.534399, type: 3 }, { time: 14.441429, type: 2 },
+            { time: 16.436893, type: 2 }, { time: 17.298571,type: 3 }, { time: 18.250952, type: 2 },
+            { time: 20.110363, type: 1 }, { time: 21.062744, type: 2 }, { time: 21.561610, type: 3 }, { time: 22.060476, type: 2 },
+            { time: 24.010590, type: 1 }, { time: 25.824649, type: 1 },
+            { time: 27.729410, type: 1 }, { time: 28.727143, type: 2 }, { time: 29.180658, type: 3 }, { time: 29.634172, type: 2 },
+            { time: 31.538934, type: 1 },
+            { time: 33.398345, type: 2 }, { time: 34.305374, type: 3 }, { time: 35.167052, type: 2 },
+            { time: 36.935760, type: 1 }, { time: 37.888141, type: 2 }, { time: 38.341655, type: 3 }, { time: 38.749819, type: 2 },
+            { time: 40.473175, type: 2 }, { time: 41.334853, type: 3 }, { time: 42.241882, type: 2 },
+            { time: 44.146644, type: 1 }, { time: 45.053673, type: 2 }, { time: 45.507188, type: 3 }, { time: 45.915351, type: 2 },
+            { time: 47.910816, type: 2 }, { time: 48.863197, type: 3 }, { time: 49.815578, type: 2 }
+        ]
+    },
+    //"網待ち": { "大太鼓": [], "〆太鼓": [], "小鉦・大鉦": [] },
+    //"打ち込み": { "大太鼓": [], "〆太鼓": [], "小鉦・大鉦": [] },
+    //"庭先き": { "大太鼓": [], "〆太鼓": [], "小鉦・大鉦": [] }
+};
+
+// --- ゲームシステム制御 ---
+let selectedGakki = ""; let selectedKyoku = ""; let selectedLevel = 1; 
+let startTime = 0; let isPlaying = false;
+const JUDGE_X = 80; const NOTE_SPEED = 250;
+let currentNotes = []; let bgmAudio = null;
+
+let countRyo = 0; let countKa = 0; let countMiss = 0;
+let judgeText = ""; let judgeTextTimer = 0;
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight * 0.22; }
+window.addEventListener('resize', resizeCanvas); resizeCanvas();
+
+window.nextScreen = (screenId) => {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+    window.scrollTo(0, 0); 
+}
+
+window.selectGakki = (gakki) => {
+    selectedGakki = gakki;
+    
+    const btnDon = document.getElementById('btnDon');
+    const kaneSvg = document.getElementById('kaneSvg');
+    const taikoSvg = document.getElementById('taikoSvg');
+
+    if (selectedGakki === "大太鼓" || selectedGakki === "〆太鼓") {
+        btnDon.classList.add('hide-btn');      // 中ボタンを隠す
+        kaneSvg.style.display = "none";         // 鉦を隠す
+        taikoSvg.style.display = "block";       // 太鼓を出す
+    } else {
+        btnDon.classList.remove('hide-btn');   // 中ボタンを出す
+        kaneSvg.style.display = "block";        // 鉦を出して
+        taikoSvg.style.display = "none";        // 太鼓を隠す
+    }
+
+    const listDiv = document.getElementById('kyokuList'); listDiv.innerHTML = "";
+    kyokuMasta.forEach(kyoku => {
+        const button = document.createElement('button'); button.className = "btn btn-blue";
+        button.innerText = kyoku; 
+        button.onclick = () => { selectedKyoku = kyoku; nextScreen('screenLevel'); }; 
+        listDiv.appendChild(button);
+    });
+    nextScreen('screenKyoku');
+}
+
+window.selectLevel = (level) => { selectedLevel = level; startGame(); }
+
+window.abortGame = () => {
+    if (confirm("お稽古を中断してメニューに戻りますか？")) {
+        isPlaying = false;
+        if (bgmAudio) { bgmAudio.pause(); bgmAudio.currentTime = 0; }
+        
+        // 💡 中断時に「中」ボタンの非表示状態をリセット
+        document.getElementById('btnDon').classList.remove('hide-btn');
+        window.nextScreen('screenMenu');
+    }
+};
+
+function startGame() {
+    document.getElementById('txtGakki').innerText = selectedGakki;
+    document.getElementById('txtKyoku').innerText = selectedKyoku;
+    
+    // 💡 難易度表示のテキスト切り替え
+    let levelText = "かんたん";
+    if (selectedLevel === 2) levelText = "ふつう";
+    if (selectedLevel === 3) levelText = "おに";
+    document.getElementById('txtLevel').innerText = levelText;
+
+    countRyo = 0; countKa = 0; countMiss = 0; judgeText = "";
+    document.getElementById('txtScore').innerText = "100.0";
+
+    if (hayashiScores[selectedKyoku] && hayashiScores[selectedKyoku][selectedGakki]) {
+        currentNotes = JSON.parse(JSON.stringify(hayashiScores[selectedKyoku][selectedGakki]));
+    } else { currentNotes = []; }
+
+    window.nextScreen('screenGame');
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    if (bgmAudio) { bgmAudio.pause(); }
+    bgmAudio = new Audio(bgmUrls[selectedKyoku]);
+    bgmAudio.preload = "auto";
+    
+    bgmAudio.addEventListener('canplaythrough', () => {
+        setTimeout(() => { if(isPlaying) return; bgmAudio.play(); startTime = performance.now(); isPlaying = true; gameLoop(); }, 1000);
+    }, { once: true });
+    bgmAudio.addEventListener('error', () => {
+        startTime = performance.now(); isPlaying = true; gameLoop();
+    }, { once: true });
+}
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSynthSound(type) {
+    let targetAudioId = "";
+
+    if (selectedGakki === "大太鼓") {
+        targetAudioId = `soundO${type}`;
+    } else if (selectedGakki === "〆太鼓") {
+        targetAudioId = `soundShime${type}`;
+    } else if (selectedGakki === "小鉦・大鉦") {
+        targetAudioId = `soundKane${type}`;
+    }
+
+    // 音声を再生
+    if (targetAudioId) {
+        const audioFile = document.getElementById(targetAudioId);
+        if (audioFile) {
+            audioFile.currentTime = 0;
+            audioFile.play().catch(err => console.log("再生エラー:", err));
+        }
+    }
+
+    // ✨ 画面上のビジュアルアニメーション連動
+    if (selectedGakki === "大太鼓" || selectedGakki === "〆太鼓") {
+        // 太鼓用の光るエフェクト (type: 2=左, 3=右)
+        const taikoPart = document.getElementById(`taikoPart${type}`);
+        if (taikoPart) {
+            taikoPart.classList.add('taiko-active');
+            setTimeout(() => { taikoPart.classList.remove('taiko-active'); }, 80); 
+        }
+    } else {
+        // 鉦用の光るエフェクト (元々の処理)
+        const kanePart = document.getElementById(`kanePart${type}`);
+        if (kanePart) {
+            kanePart.classList.add('kane-active');
+            setTimeout(() => { kanePart.classList.remove('kane-active'); }, 100); 
+        }
+    }
+}
+
+function calculateCurrentScore() {
+    let currentScore = 100.0 - (countKa * 0.5) - (countMiss * 2.0);
+    if (currentScore < 0) currentScore = 0.0;
+    return currentScore.toFixed(1);
+}
+
+function gameLoop() {
+    if (!isPlaying) return;
+    const currentTime = (performance.now() - startTime) / 1000;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const centerY = canvas.height / 2;
+
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(0, centerY); ctx.lineTo(canvas.width, centerY); ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(JUDGE_X, centerY, 30, 0, Math.PI * 2); ctx.stroke();
+
+    if (judgeTextTimer > 0) {
+        ctx.fillStyle = judgeText === "良" ? "#ff0" : (judgeText === "可" ? "#0f0" : "#f33");
+        ctx.font = "bold 24px sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(judgeText, JUDGE_X, centerY - 40); judgeTextTimer--;
+    }
+
+    let activeNotes = 0;
+    currentNotes.forEach(note => {
+        if (note.isHit) return;
+        const x = (note.time - currentTime) * NOTE_SPEED + JUDGE_X;
+        if (x < JUDGE_X - 40) {
+            note.isHit = true; countMiss++; judgeText = "不可"; judgeTextTimer = 30;
+            document.getElementById('txtScore').innerText = calculateCurrentScore();
+            return;
+        }
+        activeNotes++;
+        if (x > -30 && x < canvas.width + 30) {
+            // 💡 難易度（レベル）によるノーツの見た目切り替え
+            if (selectedLevel === 3) {
+                // 👹 おに：キャンバス（画面）には何も描画しない（透明）
+                return;
+            } else if (selectedLevel === 2) {
+                // 🔥 ふつう：すべて白色（色なし白黒）
+                ctx.fillStyle = '#ffffff';
+            } else {
+                // 🔰 かんたん：ボタンの色と連動（色あり）
+                ctx.fillStyle = note.type === 1 ? '#d9534f' : (note.type === 2 ? '#337ab7' : '#2eb82e');
+            }
+            
+            // ノーツ（丸）を描画（「おに」以外の場合のみここが実行されます）
+            ctx.beginPath(); ctx.arc(x, centerY, 22, 0, Math.PI * 2); ctx.fill();
+        }
+    });
+
+    const lastNoteTime = currentNotes.length > 0 ? currentNotes[currentNotes.length - 1].time : 0;
+    if (currentTime > lastNoteTime + 2 || (bgmAudio && bgmAudio.ended)) { 
+        isPlaying = false; if(bgmAudio) bgmAudio.pause(); endGame(); return;
+    }
+    requestAnimationFrame(gameLoop);
+}
+
+function checkHit(type) {
+    if (!isPlaying) return;
+    const currentTime = (performance.now() - startTime) / 1000;
+    let isNoteFound = false;
+    for (let note of currentNotes) {
+        if (!note.isHit) {
+            const diff = Math.abs(note.time - currentTime);
+            if (diff < 0.25) {
+                isNoteFound = true;
+                if (note.type === type) {
+                    if (diff < 0.06) { note.isHit = true; countRyo++; judgeText = "良"; judgeTextTimer = 30; } 
+                    else if (diff < 0.15) { note.isHit = true; countKa++; judgeText = "可"; judgeTextTimer = 30; } 
+                    else { note.isHit = true; countMiss++; judgeText = "不可"; judgeTextTimer = 30; }
+                } else { note.isHit = true; countMiss++; judgeText = "不可"; judgeTextTimer = 30; }
+                break;
+            }
+        }
+    }
+    if (!isNoteFound) { countMiss++; judgeText = "不可"; judgeTextTimer = 20; }
+    document.getElementById('txtScore').innerText = calculateCurrentScore();
+}
+
+function endGame() {
+    const finalScore = calculateCurrentScore();
+    document.getElementById('resScore').innerText = `${finalScore} 点`;
+    document.getElementById('resRyo').innerText = countRyo; 
+    document.getElementById('resKa').innerText = countKa;
+    window.nextScreen('screenResult');
+    
+    if (window.currentUser && typeof window.saveScoreToFirebase === 'function') {
+        // 👈 引数の3番目に「selectedLevel」を追加します
+        window.saveScoreToFirebase(selectedGakki, selectedKyoku, selectedLevel, parseFloat(finalScore), countRyo, countKa);
+    }
+}
+
+const handlePress = (type) => { playSynthSound(type); checkHit(type); };
+document.getElementById('btnLeft').addEventListener('touchstart', (e) => { e.preventDefault(); handlePress(2); });
+document.getElementById('btnDon').addEventListener('touchstart', (e) => { e.preventDefault(); handlePress(1); });
+document.getElementById('btnRight').addEventListener('touchstart', (e) => { e.preventDefault(); handlePress(3); });
+document.getElementById('btnLeft').addEventListener('mousedown', () => handlePress(2));
+document.getElementById('btnDon').addEventListener('mousedown', () => handlePress(1));
+document.getElementById('btnRight').addEventListener('mousedown', () => handlePress(3));
+
+window.addEventListener('keydown', (e) => {
+    if(e.key === 'f' || e.key === 'F') handlePress(1);
+    if(e.key === 'd' || e.key === 'D') handlePress(2);
+    if(e.key === 'j' || e.key === 'J') handlePress(3);
+});
+</script>
+</body>
+</html>
