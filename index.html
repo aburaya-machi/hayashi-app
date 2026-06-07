@@ -188,7 +188,7 @@
 <body>
     
     <div id="screenMenu" class="screen active">
-        <h1>🏮 油屋町 囃子稽古アプリ 🏮</h1>
+        <h1>🏮 油屋町 🏮<br>囃子稽古アプリ</h1>
         <div id="userStatus">読み込み中...</div>
         <button class="btn" onclick="nextScreen('screenGakki')">稽古を始める</button>
         <button id="myPageBtn" class="btn btn-blue btn-disabled" onclick="if(window.currentUser){ nextScreen('screenHistory'); window.loadHistory(); }">マイページ (履歴)</button>
@@ -341,7 +341,53 @@ const bgmUrls = {
 };
 
 const hayashiScores = {
-    "道行き": { "大太鼓": [], "〆太鼓": [], "小鉦・大鉦": [] },
+    "道行き": { "大太鼓": 
+    [
+        { time: 4.555190, type: 3 },{ time: 5.907531, type: 2 },{ time: 7.268076, type: 3 },
+{ time: 17.472157, type: 3 },{ time: 18.696647, type: 2 },{ time: 19.694380, type: 3 },
+{ time: 29.832267, type: 3 },{ time: 30.849781, type: 2 },{ time: 31.938217, type: 3 },
+{ time: 42.006244, type: 3 },{ time: 43.185382, type: 2 },{ time: 44.273817, type: 3 },
+{ time: 54.360214, type: 3 },{ time: 55.430280, type: 2 },{ time: 56.564067, type: 3 },
+{ time: 66.677446, type: 3 },{ time: 67.675385, type: 2 },{ time: 68.763613, type: 3 },
+
+    ], 
+    "〆太鼓": [
+{ time: 9.279539, type: 3 },{ time: 10.442679, type: 2 },{ time: 11.442348, type: 3 },
+{ time: 13.435876, type: 3 },{ time: 14.478960, type: 2 },{ time: 15.476692, type: 3 },
+{ time: 17.472157, type: 3 },{ time: 18.696647, type: 2 },{ time: 19.694380, type: 3 },
+{ time: 21.735196, type: 3 },{ time: 22.914334, type: 2 },{ time: 23.957418, type: 3 },
+{ time: 25.832882, type: 3 },{ time: 26.811584, type: 2 },{ time: 27.857645, type: 3 },
+{ time: 29.832267, type: 3 },{ time: 30.849781, type: 2 },{ time: 31.938217, type: 3 },
+{ time: 33.933681, type: 3 },{ time: 35.022117, type: 2 },{ time: 36.110552, type: 3 },
+{ time: 37.988111, type: 3 },{ time: 39.013046, type: 2 },{ time: 40.056130, type: 3 },
+{ time: 42.006244, type: 3 },{ time: 43.185382, type: 2 },{ time: 44.273817, type: 3 },
+{ time: 46.223931, type: 3 },{ time: 47.357718, type: 2 },{ time: 48.446153, type: 3 },
+{ time: 50.350915, type: 3 },{ time: 51.439350, type: 2 },{ time: 52.391731, type: 3 },
+{ time: 54.360214, type: 3 },{ time: 55.430280, type: 2 },{ time: 56.564067, type: 3 },
+{ time: 58.559532, type: 3 },{ time: 59.602616, type: 2 },{ time: 60.691051, type: 3 },
+{ time: 62.612720, type: 3 },{ time: 63.638897, type: 2 },{ time: 64.636629, type: 3 },
+{ time: 66.677446, type: 3 },{ time: 67.675385, type: 2 },{ time: 68.763613, type: 3 },
+{ time: 70.849781, type: 3 },{ time: 71.952673, type: 2 },{ time: 72.967622, type: 3 },
+{ time: 74.876694, type: 3 },{ time: 75.976223, type: 2 },{ time: 76.972230, type: 3 }], 
+    "小鉦・大鉦": [
+        { time: 9.279539, type: 2 },{ time: 10.442679, type: 3 },{ time: 11.442348, type: 2 },
+{ time: 13.435876, type: 2 },{ time: 14.478960, type: 3 },{ time: 15.476692, type: 2 },
+{ time: 17.472157, type: 2 },{ time: 18.696647, type: 3 },{ time: 19.694380, type: 2 },
+{ time: 21.735196, type: 2 },{ time: 22.914334, type: 3 },{ time: 23.957418, type: 2 },
+{ time: 25.832882, type: 2 },{ time: 26.811584, type: 3 },{ time: 27.857645, type: 2 },
+{ time: 29.832267, type: 2 },{ time: 30.849781, type: 3 },{ time: 31.938217, type: 2 },
+{ time: 33.933681, type: 2 },{ time: 35.022117, type: 3 },{ time: 36.110552, type: 2 },
+{ time: 37.988111, type: 2 },{ time: 39.013046, type: 3 },{ time: 40.056130, type: 2 },
+{ time: 42.006244, type: 2 },{ time: 43.185382, type: 3 },{ time: 44.273817, type: 2 },
+{ time: 46.223931, type: 2 },{ time: 47.357718, type: 3 },{ time: 48.446153, type: 2 },
+{ time: 50.350915, type: 2 },{ time: 51.439350, type: 3 },{ time: 52.391731, type: 2 },
+{ time: 54.360214, type: 2 },{ time: 55.430280, type: 3 },{ time: 56.564067, type: 2 },
+{ time: 58.559532, type: 2 },{ time: 59.602616, type: 3 },{ time: 60.691051, type: 2 },
+{ time: 62.612720, type: 2 },{ time: 63.638897, type: 3 },{ time: 64.636629, type: 2 },
+{ time: 66.677446, type: 2 },{ time: 67.675385, type: 3 },{ time: 68.763613, type: 2 },
+{ time: 70.849781, type: 2 },{ time: 71.952673, type: 3 },{ time: 72.967622, type: 2 },
+{ time: 74.876694, type: 2 },{ time: 75.976223, type: 3 },{ time: 76.972230, type: 2 }
+    ] },
    
     "はしり・まわし": { 
     "大太鼓": [
