@@ -41,7 +41,30 @@
         .form-group input { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #fff; background: #333; color: white; }
 
         /* --- 縦向き画面用の三等分レイアウト調整 --- */
-        #gameTopArea { width: 100vw; height: 38vh; display: flex; justify-content: center; align-items: center; background: #111; position: relative; }
+       #gameTopArea { 
+    width: 100vw; 
+    height: 38vh; /* 高さは元の38vhのままキープ */
+    box-sizing: border-box; /* paddingを含めたサイズ計算にする */
+    padding-top: 55px; /* 💡 上部に55pxの余白を作り、中のSVGだけを下へ押し下げる */
+    
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    background: #111; 
+    position: relative; 
+}
+
+/* infoOverlay（文字）の位置はそのままで固定 */
+#infoOverlay {
+    position: absolute; 
+    top: 12px; 
+    left: 12px; 
+    font-size: 14px;
+    background: rgba(0,0,0,0.7); 
+    padding: 6px 10px; 
+    border-radius: 5px; 
+    z-index: 5;
+}
         #gameCanvas { display: block; background: #222; width: 100vw; height: 22vh; }
         #controls { display: flex; width: 100vw; height: 40vh; } /* ボタンを押しやすくするため下部を広めに */
         
@@ -59,10 +82,7 @@
         #btnRight{ background-color: #2eb82e; }
         .hit-btn:active { opacity: 0.6; }
         
-        #infoOverlay {
-            position: absolute; top: 12px; left: 12px; font-size: 14px;
-            background: rgba(0,0,0,0.7); padding: 6px 10px; border-radius: 5px; z-index: 5;
-        }
+       
 
         .kane-part { fill: #998040; stroke: #fff; stroke-width: 2; transition: fill 0.1s ease; }
         .kane-active { fill: #ffdf00 !important; filter: drop-shadow(0px 0px 15px #ffdf00); }
@@ -818,9 +838,16 @@ function gameLoop() {
         }
     });
 
+    // 🎵 BGM（MP3）の再生が終わったか、またはBGMがない/読み込み失敗時は最後のノーツから5秒後に終了（安全対策）
     const lastNoteTime = currentNotes.length > 0 ? currentNotes[currentNotes.length - 1].time : 0;
-    if (currentTime > lastNoteTime + 2 || (bgmAudio && bgmAudio.ended)) { 
-        isPlaying = false; if(bgmAudio) bgmAudio.pause(); endGame(); return;
+    const isAudioEnded = bgmAudio && bgmAudio.ended;
+    const isTimeout = currentTime > lastNoteTime + 5; // 音声が鳴らない場合のバックアップ
+
+    if (isAudioEnded || isTimeout) { 
+        isPlaying = false; 
+        if(bgmAudio) bgmAudio.pause(); 
+        endGame(); 
+        return;
     }
     requestAnimationFrame(gameLoop);
 }
