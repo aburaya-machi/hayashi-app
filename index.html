@@ -157,6 +157,7 @@
                 });
             } catch (e) { console.error(e); }
         };
+        
 
         window.loadHistory = async () => {
             if (!window.currentUser) return;
@@ -211,7 +212,7 @@
         <h1>🏮 油屋町 🏮<br>囃子稽古アプリ</h1>
         <div id="userStatus">読み込み中...</div>
         <button class="btn" onclick="nextScreen('screenGakki')">稽古を始める</button>
-        <button id="myPageBtn" class="btn btn-blue btn-disabled" onclick="if(window.currentUser){ nextScreen('screenHistory'); window.loadHistory(); }">マイページ (履歴)</button>
+        <button id="myPageBtn" class="btn btn-blue btn-disabled" onclick="if(window.currentUser){ window.showAchievements(); }">マイページ (成果)</button>
         <button id="gotoLoginBtn" class="btn btn-gold" onclick="nextScreen('screenAuth')">ログイン画面へ</button>
         <button id="logoutBtn" class="btn" style="background:#555; display:none;" onclick="window.logout()">ログアウト</button>
     </div>
@@ -231,9 +232,9 @@
     </div>
 
     <div id="screenHistory" class="screen">
-        <h2>過去の稽古履歴 (最新10件)</h2>
-        <div id="historyList"></div>
-        <button class="btn" style="background:#555;" onclick="nextScreen('screenMenu')">メニューに戻る</button>
+    <h2>お稽古の成果（目標90点！）</h2>
+    <div id="historyList"></div>
+    <button class="btn" style="background:#555;" onclick="nextScreen('screenMenu')">メニューに戻る</button>
     </div>
 
     <div id="screenGakki" class="screen">
@@ -876,14 +877,95 @@ function checkHit(type) {
 
 function endGame() {
     const finalScore = calculateCurrentScore();
+    const numericScore = parseFloat(finalScore);
+    
     document.getElementById('resScore').innerText = `${finalScore} 点`;
     document.getElementById('resRyo').innerText = countRyo; 
     document.getElementById('resKa').innerText = countKa;
+
+    // 💡 ✨【新設】星システム用のハイスコアローカル保存処理
+    // キーの例：「大太鼓_東京音頭_1」
+    const saveKey = `highscore_${selectedGakki}_${selectedKyoku}_${selectedLevel}`;
+    const pastHighScore = parseFloat(localStorage.getItem(saveKey) || "0.0");
+    
+    // 今回のスコアが過去のハイスコアを上回っていたら更新
+    if (numericScore > pastHighScore) {
+        localStorage.setItem(saveKey, finalScore);
+    }
+
     window.nextScreen('screenResult');
     
     if (window.currentUser && typeof window.saveScoreToFirebase === 'function') {
-        // 👈 引数の3番目に「selectedLevel」を追加します
-        window.saveScoreToFirebase(selectedGakki, selectedKyoku, selectedLevel, parseFloat(finalScore), countRyo, countKa);
+        window.saveScoreToFirebase(selectedGakki, selectedKyoku, selectedLevel, numericScore, countRyo, countKa);
+    }
+
+    if (window.currentUser && typeof window.saveScoreToFirebase === 'function') {
+        window.saveScoreToFirebase(selectedGakki, selectedKyoku, selectedLevel, numericScore, countRyo, countKa);
+        // --- ✨ 星（お稽古の成果）システム制御 ---
+        window.showAchievements = () => {
+            const container = document.getElementById('historyList');
+            if (!container) return;
+            
+            container.innerHTML = ""; // 一度中身をクリア
+
+            // 楽器のリスト
+            const gakkiList = ["小鉦・大鉦", "〆太鼓", "大太鼓"];
+
+            // すべての曲と楽器の組み合わせをループ処理
+            kyokuMasta.forEach(kyoku => {
+                gakkiList.forEach(gakki => {
+                    
+                    // 各レベル（1〜3）のハイスコアをローカルストレージから取得
+                    const scoreLvl1 = parseFloat(localStorage.getItem(`highscore_${gakki}_${kyoku}_1`) || "0.0");
+                    const scoreLvl2 = parseFloat(localStorage.getItem(`highscore_${gakki}_${kyoku}_2`) || "0.0");
+                    const scoreLvl3 = parseFloat(localStorage.getItem(`highscore_${gakki}_${kyoku}_3`) || "0.0");
+
+                    // 行（カード）の作成
+                    const row = document.createElement('div');
+                    row.style.cssText = "display: flex; flex-direction: column; width: 100%; max-width: 400px; background: rgba(255,255,255,0.05); margin-bottom: 12px; padding: 12px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box;";
+
+                    // タイトル（楽器名と曲名）
+                    const title = document.createElement('div');
+                    title.style.cssText = "font-size: 14px; font-weight: bold; margin-bottom: 8px; color: #f0ad4e; text-align: left;";
+                    title.innerText = `${gakki} ─ ${kyoku}`;
+                    row.appendChild(title);
+
+                    // 星を横並びにするコンテナ
+                    const starRow = document.createElement('div');
+                    starRow.style.cssText = "display: flex; gap: 8px; align-items: center;";
+
+                    // 5つの星の条件判定
+                    const starConditions = [
+                        { isCleared: scoreLvl1 >= 90.0, label: "かんたんクリア(90点)" },
+                        { isCleared: scoreLvl2 >= 90.0, label: "ふつうクリア(90点)" },
+                        { isCleared: scoreLvl3 >= 90.0, label: "おにクリア(90点)" },
+                        { isCleared: (scoreLvl1 >= 95.0 || scoreLvl2 >= 95.0 || scoreLvl3 >= 95.0), label: "達人(いずれかで95点)" },
+                        { isCleared: (scoreLvl1 >= 100.0 || scoreLvl2 >= 100.0 || scoreLvl3 >= 100.0), label: "極め(いずれかで100点)" }
+                    ];
+
+                    // 星を1つずつHTMLとして生成
+                    starConditions.forEach(star => {
+                        const starSpan = document.createElement('span');
+                        starSpan.title = star.label; // パソコン等でマウスを乗せた時に条件が出るようにする
+                        
+                        if (star.isCleared) {
+                            starSpan.innerText = "★";
+                            starSpan.style.cssText = "color: #ffdf00; text-shadow: 0 0 8px #ffdf00; font-size: 22px; cursor: help;";
+                        } else {
+                            starSpan.innerText = "☆";
+                            starSpan.style.cssText = "color: #444; font-size: 22px; cursor: help;";
+                        }
+                        starRow.appendChild(starSpan);
+                    });
+
+                    row.appendChild(starRow);
+                    container.appendChild(row);
+                });
+            });
+
+            // 画面遷移
+            window.nextScreen('screenHistory');
+        };
     }
 }
 
