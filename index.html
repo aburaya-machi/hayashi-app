@@ -964,8 +964,8 @@ function endGame() {
                     { isCleared: scoreLvl1 >= 90.0, label: "かんたん" },
                     { isCleared: scoreLvl2 >= 90.0, label: "ふつう" },
                     { isCleared: scoreLvl3 >= 90.0, label: "おに" },
-                    { isCleared: (scoreLvl1 >= 95.0 || scoreLvl2 >= 95.0 || scoreLvl3 >= 95.0), label: "95点突破" },
-                    { isCleared: (scoreLvl1 >= 100.0 || scoreLvl2 >= 100.0 || scoreLvl3 >= 100.0), label: "100点満点" }
+                    { isCleared: (scoreLvl2 >= 95.0), label: "95点突破（ふつうレベル）" },
+                    { isCleared: (scoreLvl2 >= 100.0), label: "100点満点（ふつうレベル）" }
                 ];
 
                 // 条件ごとの星を縦、または程よい間隔で配置するためのコンテナ
@@ -1005,15 +1005,15 @@ function endGame() {
                 container.appendChild(row);
             });
 
-            // 🎵 3. 応援メッセージ（星がまだ1つもない時の処理）
-            if (totalStars === 0) {
-                const welcomeMsg = document.createElement('div');
-                welcomeMsg.style.cssText = "background: rgba(240,173,78,0.15); border: 1px dashed #f0ad4e; color: #f0ad4e; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; font-size: 13px; width: 100%; max-width: 400px; box-sizing: border-box; line-height: 1.6;";
-                welcomeMsg.innerHTML = "<strong>目指せ！お稽古で90点以上</strong><br>各難易度で90点を超えると★が点灯します！さらに上の『95点』や『100点』の極み星にも挑戦してみましょう。";
-                
-                // タブボタンの下、曲カードの上にメッセージを挟む
-                container.insertBefore(welcomeMsg, tabContainer.nextSibling);
-            }
+            // 🎵 3. 応援メッセージ
+           
+            const welcomeMsg = document.createElement('div');
+            welcomeMsg.style.cssText = "background: rgba(240,173,78,0.15); border: 1px dashed #f0ad4e; color: #f0ad4e; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; font-size: 13px; width: 100%; max-width: 600px; box-sizing: border-box; line-height: 1.6;";
+            welcomeMsg.innerHTML = "<strong>目指せ！90点以上</strong><br>それぞれのレベルで90点を超えると★がつきます！さらに上の『95点』や『100点』にもチャレンジしよう！";
+            
+            // タブボタンの下、曲カードの上にメッセージを挟む
+            container.insertBefore(welcomeMsg, tabContainer.nextSibling);
+            
 
             // 画面遷移
             window.nextScreen('screenHistory');
