@@ -156,9 +156,12 @@
             }
         });
 
+       // --- 💡【アップデート】スコア保存と同時に「星の達成状況」も直接保存・更新する ---
         window.saveScoreToFirebase = async (gakki, kyoku, level, score, ryo, ka) => {
             if (!window.currentUser) return;
+            
             try {
+                // 1. 従来のスコア履歴を保存
                 await addDoc(collection(db, "scores"), {
                     uid: window.currentUser.uid, 
                     userEmail: window.currentUser.email,
@@ -170,7 +173,61 @@
                     ka: ka, 
                     timestamp: new Date()
                 });
-            } catch (e) { console.error(e); }
+
+                // 2. ✨ 星（成果）の直接保存・更新処理
+                // ユーザーごと・楽器ごと・曲ごとに1つのドキュメントにまとめるためのIDを作成
+                // 例: "ユーザーID_〆太鼓_道行き"
+                const achievementDocId = `${window.currentUser.uid}_${gakki}_${kyoku}`;
+                
+                // 今回のプレイでどの星の条件を満たしたか判定
+                const currentStars = {
+                    level1_cleared: (level === 1 && score >= 90.0),
+                    level2_cleared: (level === 2 && score >= 90.0),
+                    level3_cleared: (level === 3 && score >= 90.0),
+                    level2_95:      (level === 2 && score >= 95.0),
+                    level2_100:     (level === 2 && score >= 100.0)
+                };
+
+                // Firestore上の achievements コレクションの該当ドキュメントへの参照
+                // （Firebase v10のモジュール方式に対応した記述です）
+                import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js").then(async (fs) => {
+                    const docRef = fs.doc(db, "achievements", achievementDocId);
+                    
+                    // 既に獲得済みの星があるか一度確認する
+                    const docSnap = await fs.getDoc(docRef);
+                    
+                    let updateData = {
+                        uid: window.currentUser.uid,
+                        userEmail: window.currentUser.email,
+                        gakki: gakki,
+                        kyoku: kyoku,
+                        lastUpdated: new Date()
+                    };
+
+                    if (docSnap.exists()) {
+                        // すでにデータがある場合：過去に true だったものは true のまま、新しく true になったものを上書き
+                        const pastData = docSnap.data();
+                        updateData.level1_cleared = pastData.level1_cleared || currentStars.level1_cleared;
+                        updateData.level2_cleared = pastData.level2_cleared || currentStars.level2_cleared;
+                        updateData.level3_cleared = pastData.level3_cleared || currentStars.level3_cleared;
+                        updateData.level2_95      = pastData.level2_95      || currentStars.level2_95;
+                        updateData.level2_100     = pastData.level2_100     || currentStars.level2_100;
+                    } else {
+                        // 初めてこの曲をクリアした場合：今回の結果をそのまま入れる
+                        updateData.level1_cleared = currentStars.level1_cleared;
+                        updateData.level2_cleared = currentStars.level2_cleared;
+                        updateData.level3_cleared = currentStars.level3_cleared;
+                        updateData.level2_95      = currentStars.level2_95;
+                        updateData.level2_100     = currentStars.level2_100;
+                    }
+
+                    // データを送信（ドキュメントがなければ作成、あれば上書き）
+                    await fs.setDoc(docRef, updateData, { merge: true });
+                });
+
+            } catch (e) { 
+                console.error("Firebaseへの保存に失敗しました:", e); 
+            }
         };
 
         let activeAchievementGakki = "小鉦・大鉦";
