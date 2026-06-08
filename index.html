@@ -902,66 +902,118 @@ function endGame() {
     if (window.currentUser && typeof window.saveScoreToFirebase === 'function') {
         window.saveScoreToFirebase(selectedGakki, selectedKyoku, selectedLevel, numericScore, countRyo, countKa);
         // --- ✨ 星（お稽古の成果）システム制御 ---
+        // --- ✨ 星（お稽古の成果）システム制御 ---
+        // 選択中の楽器タブを記憶する変数（初期値は小鉦・大鉦）
+        let activeAchievementGakki = "小鉦・大鉦";
+
         window.showAchievements = () => {
             const container = document.getElementById('historyList');
             if (!container) return;
             
-            container.innerHTML = ""; // 一度中身をクリア
+            container.innerHTML = ""; // 初期化
+            container.style.cssText = "display: flex; flex-direction: column; align-items: center; width: 100%;";
 
-            // 楽器のリスト
+            // 🎵 1. 楽器切り替え用のタブ（ボタン）エリアを作成
+            const tabContainer = document.createElement('div');
+            tabContainer.style.cssText = "display: flex; width: 100%; max-width: 400px; gap: 6px; margin-bottom: 20px; box-sizing: border-box;";
+            
             const gakkiList = ["小鉦・大鉦", "〆太鼓", "大太鼓"];
-
-            // すべての曲と楽器の組み合わせをループ処理
-            kyokuMasta.forEach(kyoku => {
-                gakkiList.forEach(gakki => {
-                    
-                    // 各レベル（1〜3）のハイスコアをローカルストレージから取得
-                    const scoreLvl1 = parseFloat(localStorage.getItem(`highscore_${gakki}_${kyoku}_1`) || "0.0");
-                    const scoreLvl2 = parseFloat(localStorage.getItem(`highscore_${gakki}_${kyoku}_2`) || "0.0");
-                    const scoreLvl3 = parseFloat(localStorage.getItem(`highscore_${gakki}_${kyoku}_3`) || "0.0");
-
-                    // 行（カード）の作成
-                    const row = document.createElement('div');
-                    row.style.cssText = "display: flex; flex-direction: column; width: 100%; max-width: 400px; background: rgba(255,255,255,0.05); margin-bottom: 12px; padding: 12px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box;";
-
-                    // タイトル（楽器名と曲名）
-                    const title = document.createElement('div');
-                    title.style.cssText = "font-size: 14px; font-weight: bold; margin-bottom: 8px; color: #f0ad4e; text-align: left;";
-                    title.innerText = `${gakki} ─ ${kyoku}`;
-                    row.appendChild(title);
-
-                    // 星を横並びにするコンテナ
-                    const starRow = document.createElement('div');
-                    starRow.style.cssText = "display: flex; gap: 8px; align-items: center;";
-
-                    // 5つの星の条件判定
-                    const starConditions = [
-                        { isCleared: scoreLvl1 >= 90.0, label: "かんたんクリア(90点)" },
-                        { isCleared: scoreLvl2 >= 90.0, label: "ふつうクリア(90点)" },
-                        { isCleared: scoreLvl3 >= 90.0, label: "おにクリア(90点)" },
-                        { isCleared: (scoreLvl1 >= 95.0 || scoreLvl2 >= 95.0 || scoreLvl3 >= 95.0), label: "達人(いずれかで95点)" },
-                        { isCleared: (scoreLvl1 >= 100.0 || scoreLvl2 >= 100.0 || scoreLvl3 >= 100.0), label: "極め(いずれかで100点)" }
-                    ];
-
-                    // 星を1つずつHTMLとして生成
-                    starConditions.forEach(star => {
-                        const starSpan = document.createElement('span');
-                        starSpan.title = star.label; // パソコン等でマウスを乗せた時に条件が出るようにする
-                        
-                        if (star.isCleared) {
-                            starSpan.innerText = "★";
-                            starSpan.style.cssText = "color: #ffdf00; text-shadow: 0 0 8px #ffdf00; font-size: 22px; cursor: help;";
-                        } else {
-                            starSpan.innerText = "☆";
-                            starSpan.style.cssText = "color: #444; font-size: 22px; cursor: help;";
-                        }
-                        starRow.appendChild(starSpan);
-                    });
-
-                    row.appendChild(starRow);
-                    container.appendChild(row);
-                });
+            
+            gakkiList.forEach(gakki => {
+                const tabBtn = document.createElement('button');
+                tabBtn.innerText = gakki.replace("・", "\n"); // 鉦のボタンが長くなるので改行を入れる
+                
+                // アクティブな楽器とそれ以外でデザインを変える
+                if (gakki === activeAchievementGakki) {
+                    tabBtn.style.cssText = "flex: 1; padding: 10px 5px; font-size: 13px; font-weight: bold; background: #f0ad4e; color: #1a1a1a; border: 2px solid #fff; border-radius: 8px; cursor: pointer;";
+                } else {
+                    tabBtn.style.cssText = "flex: 1; padding: 10px 5px; font-size: 13px; font-weight: bold; background: #333; color: #ccc; border: 1px solid #555; border-radius: 8px; cursor: pointer;";
+                }
+                
+                // タブを押したら、選択中の楽器を切り替えて再描画
+                tabBtn.onclick = () => {
+                    activeAchievementGakki = gakki;
+                    window.showAchievements();
+                };
+                tabContainer.appendChild(tabBtn);
             });
+            container.appendChild(tabContainer);
+
+            // 🎵 2. 選択されている楽器の「曲」をループ処理して星を生成
+            let totalStars = 0;
+            const gakki = activeAchievementGakki; // 現在表示する楽器
+
+            kyokuMasta.forEach(kyoku => {
+                // ローカルストレージからハイスコアを取得
+                const scoreLvl1 = parseFloat(localStorage.getItem(`highscore_${gakki}_${kyoku}_1`) || "0.0");
+                const scoreLvl2 = parseFloat(localStorage.getItem(`highscore_${gakki}_${kyoku}_2`) || "0.0");
+                const scoreLvl3 = parseFloat(localStorage.getItem(`highscore_${gakki}_${kyoku}_3`) || "0.0");
+
+                // 曲ごとのカード（行）を作成
+                const row = document.createElement('div');
+                row.style.cssText = "display: flex; flex-direction: column; width: 100%; max-width: 400px; background: rgba(255,255,255,0.04); margin-bottom: 16px; padding: 14px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box;";
+
+                // 曲名タイトル
+                const title = document.createElement('div');
+                title.style.cssText = "font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #fff; text-align: left; border-left: 4px solid #f0ad4e; padding-left: 8px;";
+                title.innerText = kyoku;
+                row.appendChild(title);
+
+                // 星の達成条件（見た目で何かわかるようにラベルを設置）
+                const starConditions = [
+                    { isCleared: scoreLvl1 >= 90.0, label: "かんたん" },
+                    { isCleared: scoreLvl2 >= 90.0, label: "ふつう" },
+                    { isCleared: scoreLvl3 >= 90.0, label: "おに" },
+                    { isCleared: (scoreLvl1 >= 95.0 || scoreLvl2 >= 95.0 || scoreLvl3 >= 95.0), label: "95点突破" },
+                    { isCleared: (scoreLvl1 >= 100.0 || scoreLvl2 >= 100.0 || scoreLvl3 >= 100.0), label: "100点満点" }
+                ];
+
+                // 条件ごとの星を縦、または程よい間隔で配置するためのコンテナ
+                const starFlex = document.createElement('div');
+                starFlex.style.cssText = "display: flex; flex-direction: column; gap: 8px;";
+
+                starConditions.forEach(star => {
+                    const itemLine = document.createElement('div');
+                    itemLine.style.cssText = "display: flex; align-items: center; gap: 10px; font-size: 13px;";
+
+                    // 星のマーク（クリアなら金色、未達成ならグレー）
+                    const starSpan = document.createElement('span');
+                    if (star.isCleared) {
+                        starSpan.innerText = "★";
+                        starSpan.style.cssText = "color: #ffdf00; text-shadow: 0 0 8px #ffdf00; font-size: 20px; font-weight: bold;";
+                        totalStars++;
+                    } else {
+                        starSpan.innerText = "☆";
+                        starSpan.style.cssText = "color: #444; font-size: 20px; font-weight: bold;";
+                    }
+
+                    // 何をすればいいか分かるテキストラベル
+                    const textLabel = document.createElement('span');
+                    textLabel.innerText = star.label;
+                    if (star.isCleared) {
+                        textLabel.style.cssText = "color: #ffdf00; font-weight: bold;";
+                    } else {
+                        textLabel.style.cssText = "color: #888;";
+                    }
+
+                    itemLine.appendChild(starSpan);
+                    itemLine.appendChild(textLabel);
+                    starFlex.appendChild(itemLine);
+                });
+
+                row.appendChild(starFlex);
+                container.appendChild(row);
+            });
+
+            // 🎵 3. 応援メッセージ（星がまだ1つもない時の処理）
+            if (totalStars === 0) {
+                const welcomeMsg = document.createElement('div');
+                welcomeMsg.style.cssText = "background: rgba(240,173,78,0.15); border: 1px dashed #f0ad4e; color: #f0ad4e; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; font-size: 13px; width: 100%; max-width: 400px; box-sizing: border-box; line-height: 1.6;";
+                welcomeMsg.innerHTML = "<strong>目指せ！お稽古で90点以上</strong><br>各難易度で90点を超えると★が点灯します！さらに上の『95点』や『100点』の極み星にも挑戦してみましょう。";
+                
+                // タブボタンの下、曲カードの上にメッセージを挟む
+                container.insertBefore(welcomeMsg, tabContainer.nextSibling);
+            }
 
             // 画面遷移
             window.nextScreen('screenHistory');
