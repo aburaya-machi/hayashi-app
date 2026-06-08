@@ -41,30 +41,30 @@
         .form-group input { padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #fff; background: #333; color: white; }
 
         /* --- 縦向き画面用の三等分レイアウト調整 --- */
-       #gameTopArea { 
-    width: 100vw; 
-    height: 38vh; /* 高さは元の38vhのままキープ */
-    box-sizing: border-box; /* paddingを含めたサイズ計算にする */
-    padding-top: 55px; /* 💡 上部に55pxの余白を作り、中のSVGだけを下へ押し下げる */
-    
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    background: #111; 
-    position: relative; 
-}
+        #gameTopArea { 
+            width: 100vw; 
+            height: 38vh; /* 高さは元の38vhのままキープ */
+            box-sizing: border-box; /* paddingを含めたサイズ計算にする */
+            padding-top: 55px; /* 💡 上部に55pxの余白を作り、中のSVGだけを下へ押し下げる */
+            
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            background: #111; 
+            position: relative; 
+        }
 
-/* infoOverlay（文字）の位置はそのままで固定 */
-#infoOverlay {
-    position: absolute; 
-    top: 12px; 
-    left: 12px; 
-    font-size: 14px;
-    background: rgba(0,0,0,0.7); 
-    padding: 6px 10px; 
-    border-radius: 5px; 
-    z-index: 5;
-}
+        /* infoOverlay（文字）の位置はそのままで固定 */
+        #infoOverlay {
+            position: absolute; 
+            top: 12px; 
+            left: 12px; 
+            font-size: 14px;
+            background: rgba(0,0,0,0.7); 
+            padding: 6px 10px; 
+            border-radius: 5px; 
+            z-index: 5;
+        }
         #gameCanvas { display: block; background: #222; width: 100vw; height: 22vh; }
         #controls { display: flex; width: 100vw; height: 40vh; } /* ボタンを押しやすくするため下部を広めに */
         
@@ -81,8 +81,6 @@
         #btnDon  { background-color: #d9534f; }
         #btnRight{ background-color: #2eb82e; }
         .hit-btn:active { opacity: 0.6; }
-        
-       
 
         .kane-part { fill: #998040; stroke: #fff; stroke-width: 2; transition: fill 0.1s ease; }
         .kane-active { fill: #ffdf00 !important; filter: drop-shadow(0px 0px 15px #ffdf00); }
@@ -95,11 +93,22 @@
             fill: rgba(217, 83, 79, 0.5) !important;
         }
         #userStatus { font-size: 14px; margin-bottom: 20px; color: #ccc; }
-        #historyList { width: 100%; max-width: 400px; max-height: 180px; overflow-y: auto; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 10px; }
+        
+        /* 💡 成果表示エリア全体のスクロールとサイズを最適化 */
+        #historyList { 
+            width: 100%; 
+            max-width: 500px; 
+            max-height: 65vh; 
+            overflow-y: auto; 
+            background: rgba(0,0,0,0.4); 
+            padding: 10px; 
+            border-radius: 10px; 
+            box-sizing: border-box;
+        }
         .history-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #444; font-size: 14px; }
     </style>
 
-   <script type="module">
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -126,7 +135,6 @@
         };
         window.logout = () => { signOut(auth).then(() => alert("ログアウトしました")); };
 
-        // 💡 崩れていたログイン状態監視処理（onAuthStateChanged）を綺麗に修復しました
         onAuthStateChanged(auth, (user) => {
             const gotoLoginBtn = document.getElementById('gotoLoginBtn');
             const logoutBtn = document.getElementById('logoutBtn');
@@ -165,7 +173,6 @@
             } catch (e) { console.error(e); }
         };
 
-        // 選択中の楽器タブを記憶する変数（初期値は小鉦・大鉦）
         let activeAchievementGakki = "小鉦・大鉦";
 
         // --- ✨ 星（お稽古の成果）Firebase連携・完全版システム制御 ---
@@ -173,18 +180,15 @@
             const container = document.getElementById('historyList');
             if (!container) return;
             
-            // ログインチェック
             if (!window.currentUser) {
                 alert("ログインするとお稽古の成果を確認・保存できます！");
                 window.nextScreen('screenMenu');
                 return;
             }
             
-            // 通信中の表示
-            container.innerHTML = "<p style='text-align:center; color:#aaa; padding:20px;'>お稽古の成果を通信中...</p>";
+            container.innerHTML = "<p style='text-align:center; color:#aaa; padding:20px;'>スコアを確認中...</p>";
             container.style.cssText = "display: flex; flex-direction: column; align-items: center; width: 100%;";
 
-            // Firestoreからログインユーザーの全スコアデータを一括取得
             const highScores = {};
             
             try {
@@ -209,12 +213,11 @@
                 return;
             }
 
-            // 画面をクリアしてUIを再組み立て
             container.innerHTML = "";
 
             // 🎵 1. 楽器切り替え用のタブ（ボタン）エリアを作成
             const tabContainer = document.createElement('div');
-            tabContainer.style.cssText = "display: flex; width: 100%; max-width: 600px; gap: 6px; margin-bottom: 20px; box-sizing: border-box;";
+            tabContainer.style.cssText = "display: flex; width: 100%; max-width: 600px; gap: 6px; margin-bottom: 15px; box-sizing: border-box; flex-shrink: 0;";
             
             const gakkiList = ["小鉦・大鉦", "〆太鼓", "大太鼓"];
             
@@ -223,13 +226,13 @@
                 tabBtn.innerText = gakki.replace("・", "\n");
                 
                 if (gakki === activeAchievementGakki) {
-                    tabBtn.style.cssText = "flex: 1; padding: 10px 5px; font-size: 13px; font-weight: bold; background: #f0ad4e; color: #1a1a1a; border: 2px solid #fff; border-radius: 8px; cursor: pointer;";
+                    tabBtn.style.cssText = "flex: 1; padding: 10px 5px; font-size: 14px; font-weight: bold; background: #f0ad4e; color: #1a1a1a; border: 2px solid #fff; border-radius: 8px; cursor: pointer;";
                 } else {
-                    tabBtn.style.cssText = "flex: 1; padding: 10px 5px; font-size: 13px; font-weight: bold; background: #333; color: #ccc; border: 1px solid #555; border-radius: 8px; cursor: pointer;";
+                    tabBtn.style.cssText = "flex: 1; padding: 10px 5px; font-size: 14px; font-weight: bold; background: #333; color: #ccc; border: 1px solid #555; border-radius: 8px; cursor: pointer;";
                 }
                 
                 tabBtn.onclick = () => {
-                    activeAchievementGakki = gakki;
+                    activeAchievementGakki = gakkki = gakki;
                     window.showAchievements();
                 };
                 tabContainer.appendChild(tabBtn);
@@ -238,8 +241,8 @@
 
             // 🎵 2. 応援メッセージ（常設案内）
             const welcomeMsg = document.createElement('div');
-            welcomeMsg.style.cssText = "background: rgba(240,173,78,0.15); border: 1px dashed #f0ad4e; color: #f0ad4e; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; font-size: 13px; width: 100%; max-width: 600px; box-sizing: border-box; line-height: 1.6;";
-            welcomeMsg.innerHTML = "<strong>目指せ！90点以上</strong><br>それぞれのレベルで90点を超えると★がつきます！さらに上の『95点』や『100点』にもチャレンジしよう！";
+            welcomeMsg.style.cssText = "background: rgba(240,173,78,0.15); border: 1px dashed #f0ad4e; color: #f0ad4e; padding: 12px; border-radius: 10px; text-align: center; margin-bottom: 15px; font-size: 13px; width: 100%; max-width: 600px; box-sizing: border-box; line-height: 1.5; flex-shrink: 0;";
+            welcomeMsg.innerHTML = "<strong>目指せ！90点以上</strong><br>それぞれのレベルで90点を超えると★をゲット！<br>さらに上の『95点』や『100点』にもチャレンジしよう！";
             container.appendChild(welcomeMsg);
 
             // 🎵 3. 選択されている楽器の「曲」をループ処理して星を生成
@@ -252,11 +255,11 @@
 
                 // 曲ごとのカード（行）を作成（幅広横長スタイル）
                 const row = document.createElement('div');
-                row.style.cssText = "display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 92%; max-width: 600px; background: rgba(255,255,255,0.05); margin-bottom: 12px; padding: 16px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box; gap: 16px;";
+                row.style.cssText = "display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 98%; max-width: 600px; background: rgba(255,255,255,0.05); margin-bottom: 12px; padding: 16px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box; gap: 16px;";
 
                 // 曲名タイトル
                 const title = document.createElement('div');
-                title.style.cssText = "font-size: 16px; font-weight: bold; color: #fff; text-align: left; border-left: 4px solid #f0ad4e; padding-left: 8px; flex: 1; min-width: 120px;";
+                title.style.cssText = "font-size: 18px; font-weight: bold; color: #fff; text-align: left; border-left: 4px solid #f0ad4e; padding-left: 8px; flex: 1; min-width: 100px;";
                 title.innerText = kyoku;
                 row.appendChild(title);
 
@@ -269,21 +272,21 @@
                     { isCleared: scoreLvl2 >= 100.0, label: "100点満点（ふつう）" }
                 ];
 
-                // 条件ごとの星を綺麗に2列に並べるコンテナ
+                // 💡 条件ごとの星を縦一列（5個）に綺麗に並べるコンテナへ変更
                 const starFlex = document.createElement('div');
-                starFlex.style.cssText = "display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; flex: 2; max-width: 320px;";
+                starFlex.style.cssText = "display: flex; flex-direction: column; gap: 6px; flex: 2; max-width: 320px;";
 
                 starConditions.forEach(star => {
                     const itemLine = document.createElement('div');
-                    itemLine.style.cssText = "display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap;";
+                    itemLine.style.cssText = "display: flex; align-items: center; gap: 8px; font-size: 15px; white-space: nowrap;";
 
                     const starSpan = document.createElement('span');
                     if (star.isCleared) {
                         starSpan.innerText = "★";
-                        starSpan.style.cssText = "color: #ffdf00; text-shadow: 0 0 8px #ffdf00; font-size: 18px; font-weight: bold;";
+                        starSpan.style.cssText = "color: #ffdf00; text-shadow: 0 0 8px #ffdf00; font-size: 20px; font-weight: bold;";
                     } else {
                         starSpan.innerText = "☆";
-                        starSpan.style.cssText = "color: #444; font-size: 18px; font-weight: bold;";
+                        starSpan.style.cssText = "color: #444; font-size: 20px; font-weight: bold;";
                     }
 
                     const textLabel = document.createElement('span');
@@ -303,7 +306,6 @@
                 container.appendChild(row);
             });
 
-            // 画面遷移
             window.nextScreen('screenHistory');
         };
     </script>
@@ -311,10 +313,10 @@
 <body>
     
     <div id="screenMenu" class="screen active">
-        <h1>🏮 油屋町 🏮<br>囃子稽古アプリ</h1>
+        <h1>🏮 油屋町川船 🏮<br>囃子練習アプリ</h1>
         <div id="userStatus">読み込み中...</div>
         <button class="btn" onclick="nextScreen('screenGakki')">稽古を始める</button>
-        <button id="myPageBtn" class="btn btn-blue btn-disabled" onclick="if(window.currentUser){ window.showAchievements(); }">マイページ (成果)</button>
+        <button id="myPageBtn" class="btn btn-blue btn-disabled" onclick="if(window.currentUser){ window.showAchievements(); }">マイページ</button>
         <button id="gotoLoginBtn" class="btn btn-gold" onclick="nextScreen('screenAuth')">ログイン画面へ</button>
         <button id="logoutBtn" class="btn" style="background:#555; display:none;" onclick="window.logout()">ログアウト</button>
     </div>
@@ -334,9 +336,9 @@
     </div>
 
     <div id="screenHistory" class="screen">
-    <h2>お稽古の成果（目標90点！）</h2>
-    <div id="historyList"></div>
-    <button class="btn" style="background:#555;" onclick="nextScreen('screenMenu')">メニューに戻る</button>
+        <h2>スコア（目標90点！）</h2>
+        <div id="historyList"></div>
+        <button class="btn" style="background:#555; flex-shrink: 0;" onclick="nextScreen('screenMenu')">メニューに戻る</button>
     </div>
 
     <div id="screenGakki" class="screen">
@@ -395,29 +397,21 @@
                 <circle cx="100" cy="100" r="8" fill="#5c4921" />
             </svg>
             <svg id="taikoSvg" width="180" height="180" viewBox="0 0 200 200" style="overflow: visible; display: none;">
-        <defs>
-            <!-- 太鼓の丸い形状に切り抜く -->
-            <clipPath id="taikoClip">
-                <circle cx="100" cy="100" r="80" />
-            </clipPath>
-        </defs>
-        <!-- 太鼓の胴（茶色いフチ） -->
-        <circle cx="100" cy="100" r="86" fill="#8B4513" stroke="#5c2e0b" stroke-width="4"/>
-        <!-- 太鼓の面（本来の革の色） -->
-        <circle cx="100" cy="100" r="80" fill="#fcf3db" />
-        
-        <!-- 左右の打面パーツ（叩くとここに taiko-active クラスがついて光る） -->
-        <g clip-path="url(#taikoClip)">
-            <!-- 左半分 (type: 2) -->
-            <path id="taikoPart2" class="taiko-part" d="M 100,0 A 80,80 0 0,0 100,200 Z" fill="transparent" transition="fill 0.1s" />
-            <!-- 右半分 (type: 3) -->
-            <path id="taikoPart3" class="taiko-part" d="M 100,0 A 80,80 0 0,1 100,200 Z" fill="transparent" transition="fill 0.1s" />
-            <!-- 中心線（うっすら見える境界線） -->
-            <line x1="100" y1="0" x2="100" y2="200" stroke="#8B4513" stroke-width="2" opacity="0.2" stroke-dasharray="4" />
-        </g>
-        <!-- 太鼓の巴紋や中心の雰囲気用の飾り円 -->
-        <circle cx="100" cy="100" r="15" fill="none" stroke="#8B4513" stroke-width="2" opacity="0.3" />
-    </svg>
+                <defs>
+                    <clipPath id="taikoClip">
+                        <circle cx="100" cy="100" r="80" />
+                    </clipPath>
+                </defs>
+                <circle cx="100" cy="100" r="86" fill="#8B4513" stroke="#5c2e0b" stroke-width="4"/>
+                <circle cx="100" cy="100" r="80" fill="#fcf3db" />
+                
+                <g clip-path="url(#taikoClip)">
+                    <path id="taikoPart2" class="taiko-part" d="M 100,0 A 80,80 0 0,0 100,200 Z" fill="transparent" transition="fill 0.1s" />
+                    <path id="taikoPart3" class="taiko-part" d="M 100,0 A 80,80 0 0,1 100,200 Z" fill="transparent" transition="fill 0.1s" />
+                    <line x1="100" y1="0" x2="100" y2="200" stroke="#8B4513" stroke-width="2" opacity="0.2" stroke-dasharray="4" />
+                </g>
+                <circle cx="100" cy="100" r="15" fill="none" stroke="#8B4513" stroke-width="2" opacity="0.3" />
+            </svg>
         </div>
 
         <canvas id="gameCanvas"></canvas>
@@ -445,7 +439,6 @@
             良: <span id="resRyo" style="color:#d9534f; font-weight:bold;">0</span> 回 / 
             可: <span id="resKa" style="color:#337ab7; font-weight:bold;">0</span> 回
         </div>
-        <!-- 💡 戻るときに「中」ボタンの非表示クラスを解除するように修正 -->
         <button class="btn" onclick="document.getElementById('btnDon').classList.remove('hide-btn'); nextScreen('screenMenu');">メニューに戻る</button>
     </div>
 
@@ -458,9 +451,6 @@ const bgmUrls = {
     "はしり・まわし": "audio/hashirimawashi.mp3", 
     "根曳唄": "audio/nebikiuta.mp3", 
     "網打ち": "audio/amiuchi.mp3" 
-   // "網待ち": "audio/amimachi.m4a", 
-   // "打ち込み": "audio/uchikomi.m4a",
-    //"庭先き": "audio/niwasaki.m4a"
 };
 
 const hayashiScores = {
@@ -472,7 +462,6 @@ const hayashiScores = {
 { time: 42.006244, type: 3 },{ time: 43.185382, type: 2 },{ time: 44.273817, type: 3 },
 { time: 54.360214, type: 3 },{ time: 55.430280, type: 2 },{ time: 56.564067, type: 3 },
 { time: 66.677446, type: 3 },{ time: 67.675385, type: 2 },{ time: 68.763613, type: 3 },
-
     ], 
     "〆太鼓": [
 { time: 9.279539, type: 3 },{ time: 10.442679, type: 2 },{ time: 11.442348, type: 3 },
@@ -515,152 +504,100 @@ const hayashiScores = {
     "はしり・まわし": { 
     "大太鼓": [
         { time: 8.390310, type: 3 }, { time: 8.617067, type: 2 }, { time: 8.889176, type: 3 },
-
-       
         { time: 10.612532, type: 3 }, { time: 10.884641, type: 2 }, { time: 11.156749, type: 3 },
-        
         { time: 12.834754, type: 3 }, { time: 13.106863, type: 2 }, { time: 13.378972, type: 3 },
-        
         { time: 15.056976, type: 3 }, { time: 15.329085, type: 2 }, { time: 15.601194, type: 3 },
-        
         { time: 17.143144, type: 3 }, { time: 17.460605, type: 2 }, { time: 17.778065, type: 3 },
         { time: 18.231579, type: 3 }, { time: 18.503688, type: 2 }, { time: 18.775797, type: 3 },
-        
         { time: 19.818881, type: 3 }, 
         { time: 21.406183, type: 3 }, { time: 21.655616, type: 2 },{ time: 21.905049, type: 3 },
-        
         { time: 22.993484, type: 3 }, 
         { time: 24.580786, type: 3 }, { time: 24.807543, type: 2 },{ time: 25.034300, type: 3 },
-        
         { time: 26.122736, type: 3 }, 
         { time: 27.664686, type: 3 }, { time: 27.914119, type: 2 },{ time: 28.163552, type: 3 },
-        
         { time: 29.251988, type: 3 }, 
         { time: 30.748586, type: 3 }, { time: 30.998019, type: 2 },{ time: 31.247452, type: 3 },
         { time: 31.746, type: 3 }, { time: 31.995593, type: 2 },{ time: 32.245185, type: 3 },
-
         { time: 33.787135, type: 3 }, { time: 34.036568, type: 2 }, { time: 34.286001, type: 3 },
-
         { time: 35.782600, type: 3 }, { time: 36.054709, type: 2 }, { time: 36.326817, type: 3 },
-
         { time: 37.868768, type: 3 }, { time: 38.118201, type: 2 }, { time: 38.367634, type: 3 },
-
         { time: 39.909584, type: 3 }, { time: 40.159017, type: 2 }, { time: 40.408450, type: 3 },
-
         { time: 41.859697, type: 3 }, { time: 42.177158, type: 2 }, { time: 42.494618, type: 3 },
-
         { time: 42.993484, type: 3 }, { time: 43.492350, type: 2 }, { time: 44.263325, type: 3 },
-
         { time: 46.349493, type: 3 }, 
         { time: 49.115933, type: 3 }, { time: 50.113666, type: 2 }, { time: 50.975344, type: 3 }
          ], 
     "〆太鼓":  [
    { time: 8.390310, type: 3 }, { time: 8.639743, type: 2 }, { time: 8.889176, type: 3 },
-
     { time: 9.478745, type: 3 }, { time: 9.773530, type: 2 }, { time: 10.068314, type: 3 },
     { time: 10.612532, type: 3 }, { time: 10.884641, type: 2 }, { time: 11.156749, type: 3 },
-    
     { time: 11.746319, type: 3 }, { time: 12.041104, type: 2 }, { time: 12.335888, type: 3 },
     { time: 12.834754, type: 3 }, { time: 13.106863, type: 2 }, { time: 13.378972, type: 3 },
-    
     { time: 13.968541, type: 3 }, { time: 14.263326, type: 2 }, { time: 14.558110, type: 3 },
     { time: 15.056976, type: 3 }, { time: 15.329085, type: 2 }, { time: 15.601194, type: 3 },
-    
     { time: 16.100060, type: 3 }, { time: 16.372169, type: 2 }, { time: 16.644278, type: 3 },
     { time: 17.143144, type: 3 }, { time: 17.460605, type: 2 }, { time: 17.778065, type: 3 },
-
     { time: 18.231579, type: 3 }, { time: 18.503688, type: 2 }, { time: 18.775797, type: 3 },
-    
     { time: 19.818881, type: 3 }, { time: 20.408450, type: 3 }, { time: 20.657883, type: 2 }, { time: 20.907316, type: 3 },
     { time: 21.406183, type: 3 }, { time: 21.905049, type: 3 },
-    
     { time: 22.993484, type: 3 }, { time: 23.537702, type: 3 }, { time: 23.787135, type: 2 }, { time: 24.036568, type: 3 },
     { time: 24.580786, type: 3 }, { time: 25.034300, type: 3 },
-    
     { time: 26.122736, type: 3 }, { time: 26.666954, type: 3 }, { time: 26.915887, type: 2 }, { time: 27.165820, type: 3 },
     { time: 27.664686, type: 3 }, { time: 28.163552, type: 3 },
-    
     { time: 29.251988, type: 3 }, { time: 29.796205, type: 3 }, { time: 30.022963, type: 2 }, { time: 30.249720, type: 3 },
     { time: 30.748586, type: 3 }, { time: 31.247452, type: 3 },
-    
-    
     { time: 32.245185, type: 3 }, 
     { time: 32.744051, type: 3 }, { time: 33.016160, type: 2 }, { time: 33.288269, type: 3 },
     { time: 33.787135, type: 3 }, { time: 34.036568, type: 2 }, { time: 34.286001, type: 3 },
-
     { time: 34.784867, type: 3 }, { time: 35.056976, type: 2 }, { time: 35.329085, type: 3 },
     { time: 35.782600, type: 3 }, { time: 36.054709, type: 2 }, { time: 36.326817, type: 3 },
-
     { time: 36.825684, type: 3 }, { time: 37.097793, type: 2 }, { time: 37.369901, type: 3 },
     { time: 37.868768, type: 3 }, { time: 38.118201, type: 2 }, { time: 38.367634, type: 3 },
-
     { time: 38.866500, type: 3 }, { time: 39.138609, type: 2 }, { time: 39.410718, type: 3 },
     { time: 39.909584, type: 3 }, { time: 40.159017, type: 2 }, { time: 40.408450, type: 3 },
-
     { time: 40.907316, type: 3 }, { time: 41.156750, type: 2 }, { time: 41.406183, type: 3 },
     { time: 41.859697, type: 3 }, { time: 42.177158, type: 2 }, { time: 42.494618, type: 3 },
-
     { time: 42.993484, type: 3 }, { time: 43.492350, type: 2 }, { time: 44.263325, type: 3 },
-
     { time: 46.349493, type: 3 }, 
     { time: 47.301874, type: 3 }, { time: 47.664686, type: 2 }, { time: 48.163552, type: 3 },
     { time: 49.115933, type: 3 }, { time: 50.113666, type: 2 }, { time: 50.975344, type: 3 },
- 
     { time: 53.016160, type: 3 }, { time: 53.877838, type: 2 }, { time: 54.830219, type: 3 }, 
     { time: 56.689629, type: 3 }, { time: 57.823416, type: 2 }, { time: 58.685094, type: 3 }
     ] , 
     "小鉦・大鉦": [
    { time: 8.390310, type: 2 }, { time: 8.639743, type: 3 }, { time: 8.889176, type: 2 },
-
     { time: 9.478745, type: 2 }, { time: 9.773530, type: 3 }, { time: 10.068314, type: 2 },
     { time: 10.612532, type: 2 }, { time: 10.884641, type: 3 }, { time: 11.156749, type: 2 },
-    
     { time: 11.746319, type: 2 }, { time: 12.041104, type: 3 }, { time: 12.335888, type: 2 },
     { time: 12.834754, type: 2 }, { time: 13.106863, type: 3 }, { time: 13.378972, type: 2 },
-    
     { time: 13.968541, type: 2 }, { time: 14.263326, type: 3 }, { time: 14.558110, type: 2 },
     { time: 15.056976, type: 2 }, { time: 15.329085, type: 3 }, { time: 15.601194, type: 2 },
-    
     { time: 16.100060, type: 2 }, { time: 16.372169, type: 3 }, { time: 16.644278, type: 2 },
     { time: 17.143144, type: 2 }, { time: 17.460605, type: 3 }, { time: 17.778065, type: 2 },
-
     { time: 18.231579, type: 2 }, { time: 18.503688, type: 3 }, { time: 18.775797, type: 2 },
-    
     { time: 19.818881, type: 1 }, { time: 20.408450, type: 2 }, { time: 20.657883, type: 3 }, { time: 20.907316, type: 2 },
     { time: 21.406183, type: 1 }, { time: 21.905049, type: 1 },
-    
     { time: 22.993484, type: 1 }, { time: 23.537702, type: 2 }, { time: 23.787135, type: 3 }, { time: 24.036568, type: 2 },
     { time: 24.580786, type: 1 }, { time: 25.034300, type: 1 },
-    
     { time: 26.122736, type: 1 }, { time: 26.666954, type: 2 }, { time: 26.915887, type: 3 }, { time: 27.165820, type: 2 },
     { time: 27.664686, type: 1 }, { time: 28.163552, type: 1 },
-    
     { time: 29.251988, type: 1 }, { time: 29.796205, type: 2 }, { time: 30.022963, type: 3 }, { time: 30.249720, type: 2 },
     { time: 30.748586, type: 1 }, { time: 31.247452, type: 1 },
-    
-    
     { time: 32.245185, type: 1 }, 
     { time: 32.744051, type: 2 }, { time: 33.016160, type: 3 }, { time: 33.288269, type: 2 },
     { time: 33.787135, type: 2 }, { time: 34.036568, type: 3 }, { time: 34.286001, type: 2 },
-
     { time: 34.784867, type: 2 }, { time: 35.056976, type: 3 }, { time: 35.329085, type: 2 },
     { time: 35.782600, type: 2 }, { time: 36.054709, type: 3 }, { time: 36.326817, type: 2 },
-
     { time: 36.825684, type: 2 }, { time: 37.097793, type: 3 }, { time: 37.369901, type: 2 },
     { time: 37.868768, type: 2 }, { time: 38.118201, type: 3 }, { time: 38.367634, type: 2 },
-
     { time: 38.866500, type: 2 }, { time: 39.138609, type: 3 }, { time: 39.410718, type: 2 },
     { time: 39.909584, type: 2 }, { time: 40.159017, type: 3 }, { time: 40.408450, type: 2 },
-
     { time: 40.907316, type: 2 }, { time: 41.156750, type: 3 }, { time: 41.406183, type: 2 },
     { time: 41.859697, type: 2 }, { time: 42.177158, type: 3 }, { time: 42.494618, type: 2 },
-
     { time: 42.993484, type: 2 }, { time: 43.492350, type: 3 }, { time: 44.263325, type: 2 },
-
     { time: 46.349493, type: 1 }, 
     { time: 47.301874, type: 2 }, { time: 47.664686, type: 3 }, { time: 48.163552, type: 2 },
     { time: 49.115933, type: 2 }, { time: 50.113666, type: 3 }, { time: 50.975344, type: 2 },
- 
     { time: 53.016160, type: 2 }, { time: 53.877838, type: 3 }, { time: 54.830219, type: 2 }, 
     { time: 56.689629, type: 2 }, { time: 57.823416, type: 3 }, { time: 58.685094, type: 2 }
     ] 
@@ -672,11 +609,8 @@ const hayashiScores = {
            { time: 16.643991, type: 3 }, { time: 17.551020, type: 2 },
             { time: 20.408163, type: 3 }, 
             { time: 24.126984, type: 3 }, { time: 25.124717, type: 2 }, 
-            
             { time: 27.891156, type: 3 }, 
-            
             { time: 34.557823, type: 3 }, { time: 35.510204, type: 2 }, 
-            
             { time: 42.086168, type: 3 }, { time: 42.993197, type: 2 }, 
             { time: 44.897959, type: 3 }, 
             { time: 47.664399, type: 3 }, { time: 48.707483, type: 2 }, { time: 49.614512, type: 3 }
@@ -755,10 +689,7 @@ const hayashiScores = {
             { time: 44.146644, type: 1 }, { time: 45.053673, type: 2 }, { time: 45.507188, type: 3 }, { time: 45.915351, type: 2 },
             { time: 47.910816, type: 2 }, { time: 48.863197, type: 3 }, { time: 49.815578, type: 2 }
         ]
-    },
-    //"網待ち": { "大太鼓": [], "〆太鼓": [], "小鉦・大鉦": [] },
-    //"打ち込み": { "大太鼓": [], "〆太鼓": [], "小鉦・大鉦": [] },
-    //"庭先き": { "大太鼓": [], "〆太鼓": [], "小鉦・大鉦": [] }
+    }
 };
 
 // --- ゲームシステム制御 ---
@@ -789,13 +720,13 @@ window.selectGakki = (gakki) => {
     const taikoSvg = document.getElementById('taikoSvg');
 
     if (selectedGakki === "大太鼓" || selectedGakki === "〆太鼓") {
-        btnDon.classList.add('hide-btn');      // 中ボタンを隠す
-        kaneSvg.style.display = "none";         // 鉦を隠す
-        taikoSvg.style.display = "block";       // 太鼓を出す
+        btnDon.classList.add('hide-btn');      
+        kaneSvg.style.display = "none";         
+        taikoSvg.style.display = "block";       
     } else {
-        btnDon.classList.remove('hide-btn');   // 中ボタンを出す
-        kaneSvg.style.display = "block";        // 鉦を出して
-        taikoSvg.style.display = "none";        // 太鼓を隠す
+        btnDon.classList.remove('hide-btn');   
+        kaneSvg.style.display = "block";        
+        taikoSvg.style.display = "none";        
     }
 
     const listDiv = document.getElementById('kyokuList'); listDiv.innerHTML = "";
@@ -814,8 +745,6 @@ window.abortGame = () => {
     if (confirm("お稽古を中断してメニューに戻りますか？")) {
         isPlaying = false;
         if (bgmAudio) { bgmAudio.pause(); bgmAudio.currentTime = 0; }
-        
-        // 💡 中断時に「中」ボタンの非表示状態をリセット
         document.getElementById('btnDon').classList.remove('hide-btn');
         window.nextScreen('screenMenu');
     }
@@ -825,7 +754,6 @@ function startGame() {
     document.getElementById('txtGakki').innerText = selectedGakki;
     document.getElementById('txtKyoku').innerText = selectedKyoku;
     
-    // 💡 難易度表示のテキスト切り替え
     let levelText = "かんたん";
     if (selectedLevel === 2) levelText = "ふつう";
     if (selectedLevel === 3) levelText = "おに";
@@ -865,7 +793,6 @@ function playSynthSound(type) {
         targetAudioId = `soundKane${type}`;
     }
 
-    // 音声を再生
     if (targetAudioId) {
         const audioFile = document.getElementById(targetAudioId);
         if (audioFile) {
@@ -874,16 +801,13 @@ function playSynthSound(type) {
         }
     }
 
-    // ✨ 画面上のビジュアルアニメーション連動
     if (selectedGakki === "大太鼓" || selectedGakki === "〆太鼓") {
-        // 太鼓用の光るエフェクト (type: 2=左, 3=右)
         const taikoPart = document.getElementById(`taikoPart${type}`);
         if (taikoPart) {
             taikoPart.classList.add('taiko-active');
             setTimeout(() => { taikoPart.classList.remove('taiko-active'); }, 80); 
         }
     } else {
-        // 鉦用の光るエフェクト (元々の処理)
         const kanePart = document.getElementById(`kanePart${type}`);
         if (kanePart) {
             kanePart.classList.add('kane-active');
@@ -924,27 +848,20 @@ function gameLoop() {
         }
         activeNotes++;
         if (x > -30 && x < canvas.width + 30) {
-            // 💡 難易度（レベル）によるノーツの見た目切り替え
             if (selectedLevel === 3) {
-                // 👹 おに：キャンバス（画面）には何も描画しない（透明）
                 return;
             } else if (selectedLevel === 2) {
-                // 🔥 ふつう：すべて白色（色なし白黒）
                 ctx.fillStyle = '#ffffff';
             } else {
-                // 🔰 かんたん：ボタンの色と連動（色あり）
                 ctx.fillStyle = note.type === 1 ? '#d9534f' : (note.type === 2 ? '#337ab7' : '#2eb82e');
             }
-            
-            // ノーツ（丸）を描画（「おに」以外の場合のみここが実行されます）
             ctx.beginPath(); ctx.arc(x, centerY, 22, 0, Math.PI * 2); ctx.fill();
         }
     });
 
-    // 🎵 BGM（MP3）の再生が終わったか、またはBGMがない/読み込み失敗時は最後のノーツから5秒後に終了（安全対策）
     const lastNoteTime = currentNotes.length > 0 ? currentNotes[currentNotes.length - 1].time : 0;
     const isAudioEnded = bgmAudio && bgmAudio.ended;
-    const isTimeout = currentTime > lastNoteTime + 5; // 音声が鳴らない場合のバックアップ
+    const isTimeout = currentTime > lastNoteTime + 5; 
 
     if (isAudioEnded || isTimeout) { 
         isPlaying = false; 
@@ -985,12 +902,9 @@ function endGame() {
     document.getElementById('resRyo').innerText = countRyo; 
     document.getElementById('resKa').innerText = countKa;
 
-    // 💡 ✨【新設】星システム用のハイスコアローカル保存処理
-    // キーの例：「大太鼓_東京音頭_1」
     const saveKey = `highscore_${selectedGakki}_${selectedKyoku}_${selectedLevel}`;
     const pastHighScore = parseFloat(localStorage.getItem(saveKey) || "0.0");
     
-    // 今回のスコアが過去のハイスコアを上回っていたら更新
     if (numericScore > pastHighScore) {
         localStorage.setItem(saveKey, finalScore);
     }
@@ -999,160 +913,6 @@ function endGame() {
     
     if (window.currentUser && typeof window.saveScoreToFirebase === 'function') {
         window.saveScoreToFirebase(selectedGakki, selectedKyoku, selectedLevel, numericScore, countRyo, countKa);
-    }
-
-    if (window.currentUser && typeof window.saveScoreToFirebase === 'function') {
-        window.saveScoreToFirebase(selectedGakki, selectedKyoku, selectedLevel, numericScore, countRyo, countKa);
-        // --- ✨ 星（お稽古の成果）システム制御 ---
-        // --- ✨ 星（お稽古の成果）システム制御 ---
-        // 選択中の楽器タブを記憶する変数（初期値は小鉦・大鉦）
-        let activeAchievementGakki = "小鉦・大鉦";
-
-        // --- ✨ 星（お稽古の成果）Firebase完全連携版システム制御 ---
-        window.showAchievements = async () => {
-            const container = document.getElementById('historyList');
-            if (!container) return;
-            
-            // 💡 1. ログインチェック（Firebaseからデータを取得するため必須）
-            if (!window.currentUser) {
-                alert("ログインするとお稽古の成果を確認・保存できます！");
-                window.nextScreen('screenMenu');
-                return;
-            }
-            
-            // 通信中の表示
-            container.innerHTML = "<p style='text-align:center; color:#aaa; padding:20px;'>お稽古の成果を通信中...</p>";
-            container.style.cssText = "display: flex; flex-direction: column; align-items: center; width: 100%;";
-
-            // 🗄️ 2. 【Firestoreからログインユーザーの全スコアデータを一括取得】
-            const highScores = {}; // 各お稽古の最高得点を記録するオブジェクト
-            
-            try {
-                // scoresコレクションから自分のuidに一致するデータを抽出
-                const q = query(
-                    collection(db, "scores"), 
-                    where("uid", "==", window.currentUser.uid)
-                );
-                const querySnapshot = await getDocs(q);
-                
-                // 取得したデータをループして、各「楽器_曲名_レベル」の最高得点を割り出す
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    const scoreKey = `${data.gakki}_${data.kyoku}_${data.level}`;
-                    const numericScore = parseFloat(data.score || "0.0");
-                    
-                    if (!highScores[scoreKey] || numericScore > highScores[scoreKey]) {
-                        highScores[scoreKey] = numericScore;
-                    }
-                });
-            } catch (error) {
-                console.error("Firestoreからの成果取得に失敗しました:", error);
-                container.innerHTML = "<p style='text-align:center; color:#d9534f; padding:20px;'>データの読み込みに失敗しました。再試行してください。</p>";
-                return;
-            }
-
-            // 画面をクリアしてUIを再組み立て
-            container.innerHTML = "";
-
-            // 🎵 1. 楽器切り替え用のタブ（ボタン）エリアを作成
-            const tabContainer = document.createElement('div');
-            tabContainer.style.cssText = "display: flex; width: 100%; max-width: 600px; gap: 6px; margin-bottom: 20px; box-sizing: border-box;";
-            
-            const gakkiList = ["小鉦・大鉦", "〆太鼓", "大太鼓"];
-            
-            gakkiList.forEach(gakki => {
-                const tabBtn = document.createElement('button');
-                tabBtn.innerText = gakki.replace("・", "\n"); // 鉦のボタンが長くなるので改行を入れる
-                
-                // アクティブな楽器とそれ以外でデザインを変える
-                if (gakki === activeAchievementGakki) {
-                    tabBtn.style.cssText = "flex: 1; padding: 10px 5px; font-size: 13px; font-weight: bold; background: #f0ad4e; color: #1a1a1a; border: 2px solid #fff; border-radius: 8px; cursor: pointer;";
-                } else {
-                    tabBtn.style.cssText = "flex: 1; padding: 10px 5px; font-size: 13px; font-weight: bold; background: #333; color: #ccc; border: 1px solid #555; border-radius: 8px; cursor: pointer;";
-                }
-                
-                // タブを押したら、選択中の楽器を切り替えて再描画
-                tabBtn.onclick = () => {
-                    activeAchievementGakki = gakki;
-                    window.showAchievements(); // 再描画（データは再度一瞬で取得されます）
-                };
-                tabContainer.appendChild(tabBtn);
-            });
-            container.appendChild(tabContainer);
-
-            // 🎵 3. 応援メッセージ（常設案内）
-            const welcomeMsg = document.createElement('div');
-            welcomeMsg.style.cssText = "background: rgba(240,173,78,0.15); border: 1px dashed #f0ad4e; color: #f0ad4e; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; font-size: 13px; width: 100%; max-width: 600px; box-sizing: border-box; line-height: 1.6;";
-            welcomeMsg.innerHTML = "<strong>目指せ！90点以上</strong><br>それぞれのレベルで90点を超えると★がつきます！さらに上の『95点』や『100点』にもチャレンジしよう！";
-            container.appendChild(welcomeMsg);
-
-            // 🎵 2. 選択されている楽器の「曲」をループ処理して星を生成
-            const gakki = activeAchievementGakki; // 現在表示する楽器
-
-            kyokuMasta.forEach(kyoku => {
-                // 💡 Firestoreのデータから算出した各レベルのハイスコアを呼び出す
-                const scoreLvl1 = highScores[`${gakki}_${kyoku}_1`] || 0.0;
-                const scoreLvl2 = highScores[`${gakki}_${kyoku}_2`] || 0.0;
-                const scoreLvl3 = highScores[`${gakki}_${kyoku}_3`] || 0.0;
-
-                // 曲ごとのカード（行）を作成（幅広横長スタイル）
-                const row = document.createElement('div');
-                row.style.cssText = "display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 92%; max-width: 600px; background: rgba(255,255,255,0.05); margin-bottom: 12px; padding: 16px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box; gap: 16px;";
-
-                // 曲名タイトル
-                const title = document.createElement('div');
-                title.style.cssText = "font-size: 16px; font-weight: bold; color: #fff; text-align: left; border-left: 4px solid #f0ad4e; padding-left: 8px; flex: 1; min-width: 120px;";
-                title.innerText = kyoku;
-                row.appendChild(title);
-
-                // 星の達成条件（見た目で何かわかるようにラベルを設置 💡スコア参照元をFirestoreデータへ変更）
-                const starConditions = [
-                    { isCleared: scoreLvl1 >= 90.0, label: "かんたん" },
-                    { isCleared: scoreLvl2 >= 90.0, label: "ふつう" },
-                    { isCleared: scoreLvl3 >= 90.0, label: "おに" },
-                    { isCleared: scoreLvl2 >= 95.0, label: "95点突破（ふつうレベル）" },
-                    { isCleared: scoreLvl2 >= 100.0, label: "100点満点（ふつうレベル）" }
-                ];
-
-                // 条件ごとの星を綺麗に2列に並べるコンテナ
-                const starFlex = document.createElement('div');
-                starFlex.style.cssText = "display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; flex: 2; max-width: 320px;";
-
-                starConditions.forEach(star => {
-                    const itemLine = document.createElement('div');
-                    itemLine.style.cssText = "display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap;";
-
-                    // 星のマーク（クリアなら金色、未達成ならグレー）
-                    const starSpan = document.createElement('span');
-                    if (star.isCleared) {
-                        starSpan.innerText = "★";
-                        starSpan.style.cssText = "color: #ffdf00; text-shadow: 0 0 8px #ffdf00; font-size: 18px; font-weight: bold;";
-                    } else {
-                        starSpan.innerText = "☆";
-                        starSpan.style.cssText = "color: #444; font-size: 18px; font-weight: bold;";
-                    }
-
-                    // 何をすればいいか分かるテキストラベル
-                    const textLabel = document.createElement('span');
-                    textLabel.innerText = star.label;
-                    if (star.isCleared) {
-                        textLabel.style.cssText = "color: #ffdf00; font-weight: bold;";
-                    } else {
-                        textLabel.style.cssText = "color: #888;";
-                    }
-
-                    itemLine.appendChild(starSpan);
-                    itemLine.appendChild(textLabel);
-                    starFlex.appendChild(itemLine);
-                });
-
-                row.appendChild(starFlex);
-                container.appendChild(row);
-            });
-
-            // 画面遷移
-            window.nextScreen('screenHistory');
-        };
     }
 }
 
