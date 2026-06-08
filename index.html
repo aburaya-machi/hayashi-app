@@ -99,7 +99,7 @@
         .history-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #444; font-size: 14px; }
     </style>
 
-    <script type="module">
+   <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -126,18 +126,25 @@
         };
         window.logout = () => { signOut(auth).then(() => alert("ログアウトしました")); };
 
+        // 💡 崩れていたログイン状態監視処理（onAuthStateChanged）を綺麗に修復しました
         onAuthStateChanged(auth, (user) => {
             const gotoLoginBtn = document.getElementById('gotoLoginBtn');
             const logoutBtn = document.getElementById('logoutBtn');
             const myPageBtn = document.getElementById('myPageBtn');
             const userStatus = document.getElementById('userStatus');
+            
             if (user) {
                 window.currentUser = user;
                 userStatus.innerText = `お稽古中: ${user.email.split('@')[0]} さん`;
-                gotoLoginBtn.style.display = "none"; logoutBtn.style.display = "block"; myPageBtn.classList.remove('btn-disabled');
+                gotoLoginBtn.style.display = "none"; 
+                logoutBtn.style.display = "block"; 
+                myPageBtn.classList.remove('btn-disabled');
             } else {
-                window.currentUser = null; userStatus.innerText = "ゲストモード（スコアは保存されません）";
-                gotoLoginBtn.style.display = "block"; logoutBtn.style.display = "none"; myPageBtn.classList.add('btn-disabled');
+                window.currentUser = null; 
+                userStatus.innerText = "ゲストモード（スコアは保存されません）";
+                gotoLoginBtn.style.display = "block"; 
+                logoutBtn.style.display = "none"; 
+                myPageBtn.classList.add('btn-disabled');
             }
         });
 
@@ -149,60 +156,155 @@
                     userEmail: window.currentUser.email,
                     gakki: gakki, 
                     kyoku: kyoku, 
-                    level: level, // 👈 新しくレベルを保存
+                    level: level,
                     score: score, 
                     ryo: ryo, 
                     ka: ka, 
-                    timestamp: new Date() // 日時はここで自動保存されています
+                    timestamp: new Date()
                 });
             } catch (e) { console.error(e); }
         };
-        
 
-        window.loadHistory = async () => {
-            if (!window.currentUser) return;
-            const listDiv = document.getElementById('historyList'); 
-            listDiv.innerHTML = "読み込み中...";
+        // 選択中の楽器タブを記憶する変数（初期値は小鉦・大鉦）
+        let activeAchievementGakki = "小鉦・大鉦";
+
+        // --- ✨ 星（お稽古の成果）Firebase連携・完全版システム制御 ---
+        window.showAchievements = async () => {
+            const container = document.getElementById('historyList');
+            if (!container) return;
             
-            const q = query(collection(db, "scores"), where("uid", "==", window.currentUser.uid), orderBy("timestamp", "desc"), limit(10));
-            const querySnapshot = await getDocs(q); 
-            listDiv.innerHTML = "";
-            
-            if(querySnapshot.empty) { 
-                listDiv.innerHTML = "まだ履歴がありません。"; 
+            // ログインチェック
+            if (!window.currentUser) {
+                alert("ログインするとお稽古の成果を確認・保存できます！");
+                window.nextScreen('screenMenu');
                 return;
             }
             
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
+            // 通信中の表示
+            container.innerHTML = "<p style='text-align:center; color:#aaa; padding:20px;'>お稽古の成果を通信中...</p>";
+            container.style.cssText = "display: flex; flex-direction: column; align-items: center; width: 100%;";
+
+            // Firestoreからログインユーザーの全スコアデータを一括取得
+            const highScores = {};
+            
+            try {
+                const q = query(
+                    collection(db, "scores"), 
+                    where("uid", "==", window.currentUser.uid)
+                );
+                const querySnapshot = await getDocs(q);
                 
-                // 📅 タイムスタンプを「◯月◯日 ◯:◯」の形式に変換する処理
-                let dateStr = "";
-                if (data.timestamp) {
-                    const date = data.timestamp.toDate(); // Firebaseの時間をJSの日付に変換
-                    const month = date.getMonth() + 1;
-                    const day = date.getDate();
-                    const hours = String(date.getHours()).padStart(2, '0');
-                    const minutes = String(date.getMinutes()).padStart(2, '0');
-                    dateStr = `${month}/${day} ${hours}:${minutes}`;
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const scoreKey = `${data.gakki}_${data.kyoku}_${data.level}`;
+                    const numericScore = parseFloat(data.score || "0.0");
+                    
+                    if (!highScores[scoreKey] || numericScore > highScores[scoreKey]) {
+                        highScores[scoreKey] = numericScore;
+                    }
+                });
+            } catch (error) {
+                console.error("Firestoreからの成果取得に失敗しました:", error);
+                container.innerHTML = "<p style='text-align:center; color:#d9534f; padding:20px;'>データの読み込みに失敗しました。再試行してください。</p>";
+                return;
+            }
+
+            // 画面をクリアしてUIを再組み立て
+            container.innerHTML = "";
+
+            // 🎵 1. 楽器切り替え用のタブ（ボタン）エリアを作成
+            const tabContainer = document.createElement('div');
+            tabContainer.style.cssText = "display: flex; width: 100%; max-width: 600px; gap: 6px; margin-bottom: 20px; box-sizing: border-box;";
+            
+            const gakkiList = ["小鉦・大鉦", "〆太鼓", "大太鼓"];
+            
+            gakkiList.forEach(gakki => {
+                const tabBtn = document.createElement('button');
+                tabBtn.innerText = gakki.replace("・", "\n");
+                
+                if (gakki === activeAchievementGakki) {
+                    tabBtn.style.cssText = "flex: 1; padding: 10px 5px; font-size: 13px; font-weight: bold; background: #f0ad4e; color: #1a1a1a; border: 2px solid #fff; border-radius: 8px; cursor: pointer;";
+                } else {
+                    tabBtn.style.cssText = "flex: 1; padding: 10px 5px; font-size: 13px; font-weight: bold; background: #333; color: #ccc; border: 1px solid #555; border-radius: 8px; cursor: pointer;";
                 }
-
-                // 🔰 レベルの表示テキストを設定（データがなければ「1」にする）
-                const displayLevel = data.level ? `Lv.${data.level}` : "Lv.1";
-
-                const item = document.createElement('div'); 
-                item.className = "history-item";
                 
-                // 📄 画面に表示するHTML（日時、曲名、楽器、レベル、点数）
-                item.innerHTML = `
-                    <div style="display: flex; flex-direction: column;">
-                        <span style="font-size: 11px; color: #aaa;">${dateStr}</span>
-                        <span>${data.kyoku} (${data.gakki}) <span style="color: #f0ad4e; font-size: 12px;">${displayLevel}</span></span>
-                    </div>
-                    <strong style="align-self: center;">${data.score}点</strong>
-                `;
-                listDiv.appendChild(item);
+                tabBtn.onclick = () => {
+                    activeAchievementGakki = gakki;
+                    window.showAchievements();
+                };
+                tabContainer.appendChild(tabBtn);
             });
+            container.appendChild(tabContainer);
+
+            // 🎵 2. 応援メッセージ（常設案内）
+            const welcomeMsg = document.createElement('div');
+            welcomeMsg.style.cssText = "background: rgba(240,173,78,0.15); border: 1px dashed #f0ad4e; color: #f0ad4e; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px; font-size: 13px; width: 100%; max-width: 600px; box-sizing: border-box; line-height: 1.6;";
+            welcomeMsg.innerHTML = "<strong>目指せ！90点以上</strong><br>それぞれのレベルで90点を超えると★がつきます！さらに上の『95点』や『100点』にもチャレンジしよう！";
+            container.appendChild(welcomeMsg);
+
+            // 🎵 3. 選択されている楽器の「曲」をループ処理して星を生成
+            const gakki = activeAchievementGakki;
+
+            kyokuMasta.forEach(kyoku => {
+                const scoreLvl1 = highScores[`${gakki}_${kyoku}_1`] || 0.0;
+                const scoreLvl2 = highScores[`${gakki}_${kyoku}_2`] || 0.0;
+                const scoreLvl3 = highScores[`${gakki}_${kyoku}_3`] || 0.0;
+
+                // 曲ごとのカード（行）を作成（幅広横長スタイル）
+                const row = document.createElement('div');
+                row.style.cssText = "display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 92%; max-width: 600px; background: rgba(255,255,255,0.05); margin-bottom: 12px; padding: 16px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box; gap: 16px;";
+
+                // 曲名タイトル
+                const title = document.createElement('div');
+                title.style.cssText = "font-size: 16px; font-weight: bold; color: #fff; text-align: left; border-left: 4px solid #f0ad4e; padding-left: 8px; flex: 1; min-width: 120px;";
+                title.innerText = kyoku;
+                row.appendChild(title);
+
+                // 星の達成条件を設定
+                const starConditions = [
+                    { isCleared: scoreLvl1 >= 90.0, label: "かんたん" },
+                    { isCleared: scoreLvl2 >= 90.0, label: "ふつう" },
+                    { isCleared: scoreLvl3 >= 90.0, label: "おに" },
+                    { isCleared: scoreLvl2 >= 95.0, label: "95点突破（ふつうレベル）" },
+                    { isCleared: scoreLvl2 >= 100.0, label: "100点満点（ふつうレベル）" }
+                ];
+
+                // 条件ごとの星を綺麗に2列に並べるコンテナ
+                const starFlex = document.createElement('div');
+                starFlex.style.cssText = "display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; flex: 2; max-width: 320px;";
+
+                starConditions.forEach(star => {
+                    const itemLine = document.createElement('div');
+                    itemLine.style.cssText = "display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap;";
+
+                    const starSpan = document.createElement('span');
+                    if (star.isCleared) {
+                        starSpan.innerText = "★";
+                        starSpan.style.cssText = "color: #ffdf00; text-shadow: 0 0 8px #ffdf00; font-size: 18px; font-weight: bold;";
+                    } else {
+                        starSpan.innerText = "☆";
+                        starSpan.style.cssText = "color: #444; font-size: 18px; font-weight: bold;";
+                    }
+
+                    const textLabel = document.createElement('span');
+                    textLabel.innerText = star.label;
+                    if (star.isCleared) {
+                        textLabel.style.cssText = "color: #ffdf00; font-weight: bold;";
+                    } else {
+                        textLabel.style.cssText = "color: #888;";
+                    }
+
+                    itemLine.appendChild(starSpan);
+                    itemLine.appendChild(textLabel);
+                    starFlex.appendChild(itemLine);
+                });
+
+                row.appendChild(starFlex);
+                container.appendChild(row);
+            });
+
+            // 画面遷移
+            window.nextScreen('screenHistory');
         };
     </script>
 </head>
