@@ -217,7 +217,7 @@
 
             // 🎵 1. 楽器切り替え用のタブ（ボタン）エリアを作成
             const tabContainer = document.createElement('div');
-            tabContainer.style.cssText = "display: flex; width: 100%; max-width: 600px; gap: 6px; margin-bottom: 15px; box-sizing: border-box; flex-shrink: 0;";
+            tabContainer.style.cssText = "display: flex; width: 100%; max-width: 600px; gap: 6px; padding: 12px 0; margin-bottom: 15px; box-sizing: border-box; flex-shrink: 0; position: sticky; top: 0; background: #1a1a1a; z-index: 10;";
             
             const gakkiList = ["小鉦・大鉦", "〆太鼓", "大太鼓"];
             
@@ -253,13 +253,14 @@
                 const scoreLvl2 = highScores[`${gakki}_${kyoku}_2`] || 0.0;
                 const scoreLvl3 = highScores[`${gakki}_${kyoku}_3`] || 0.0;
 
-                // 曲ごとのカード（行）を作成（幅広横長スタイル）
+            
+                // 曲ごとのカード（行）を作成
                 const row = document.createElement('div');
-                row.style.cssText = "display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 98%; max-width: 600px; background: rgba(255,255,255,0.05); margin-bottom: 12px; padding: 16px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box; gap: 16px;";
+                row.style.cssText = "display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; width: 98%; max-width: 600px; background: rgba(255,255,255,0.05); margin-bottom: 12px; padding: 16px; border-radius: 12px; border: 1px solid #333; box-sizing: border-box; gap: 12px;";
 
                 // 曲名タイトル
                 const title = document.createElement('div');
-                title.style.cssText = "font-size: 18px; font-weight: bold; color: #fff; text-align: left; border-left: 4px solid #f0ad4e; padding-left: 8px; flex: 1; min-width: 100px;";
+                title.style.cssText = "font-size: 18px; font-weight: bold; color: #fff; text-align: left; border-left: 4px solid #f0ad4e; padding-left: 8px; flex: 1 1 100%; min-width: 100px; box-sizing: border-box;";
                 title.innerText = kyoku;
                 row.appendChild(title);
 
@@ -272,21 +273,21 @@
                     { isCleared: scoreLvl2 >= 100.0, label: "100点満点（ふつう）" }
                 ];
 
-                // 💡 条件ごとの星を縦一列（5個）に綺麗に並べるコンテナへ変更
+                // 条件ごとの星を縦一列（5個）に綺麗に並べるコンテナ
                 const starFlex = document.createElement('div');
-                starFlex.style.cssText = "display: flex; flex-direction: column; gap: 6px; flex: 2; max-width: 320px;";
+                starFlex.style.cssText = "display: flex; flex-direction: column; gap: 6px; flex: 2 1 0%; min-width: 200px; max-width: 100%; box-sizing: border-box;";
 
                 starConditions.forEach(star => {
                     const itemLine = document.createElement('div');
-                    itemLine.style.cssText = "display: flex; align-items: center; gap: 8px; font-size: 15px; white-space: nowrap;";
+                    itemLine.style.cssText = "display: flex; align-items: center; gap: 8px; font-size: 15px; white-space: normal; word-break: break-all;";
 
                     const starSpan = document.createElement('span');
                     if (star.isCleared) {
                         starSpan.innerText = "★";
-                        starSpan.style.cssText = "color: #ffdf00; text-shadow: 0 0 8px #ffdf00; font-size: 20px; font-weight: bold;";
+                        starSpan.style.cssText = "color: #ffdf00; text-shadow: 0 0 8px #ffdf00; font-size: 20px; font-weight: bold; flex-shrink: 0;";
                     } else {
                         starSpan.innerText = "☆";
-                        starSpan.style.cssText = "color: #444; font-size: 20px; font-weight: bold;";
+                        starSpan.style.cssText = "color: #444; font-size: 20px; font-weight: bold; flex-shrink: 0;";
                     }
 
                     const textLabel = document.createElement('span');
