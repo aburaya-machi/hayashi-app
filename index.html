@@ -756,6 +756,9 @@ let startTime = 0; let isPlaying = false;
 const JUDGE_X = 80; const NOTE_SPEED = 250;
 let currentNotes = []; let bgmAudio = null;
 
+// 📱 iPhone対策：あらかじめ登録されている全音声ファイルの「再生許可」を保持するオブジェクト
+let unlockedAudioElements = {};
+
 let countRyo = 0; let countKa = 0; let countMiss = 0;
 let judgeText = ""; let judgeTextTimer = 0;
 
@@ -797,7 +800,25 @@ window.selectGakki = (gakki) => {
     nextScreen('screenKyoku');
 }
 
-window.selectLevel = (level) => { selectedLevel = level; startGame(); }
+// 💡 門下生が「難易度ボタン」をタップした瞬間に、iPhoneの音声ブロックを解除する
+window.selectLevel = (level) => { 
+    selectedLevel = level; 
+    
+    // 📱 iPhone対策の核心：ボタンを押した「まさにその瞬間」に、全ての音を一瞬だけ無音再生してロック解除する
+    const gakkis = ["O", "Shime", "Kane"];
+    const types = [1, 2, 3];
+    gakkis.forEach(g => {
+        types.forEach(t => {
+            const aud = document.getElementById(`sound${g}${t}`);
+            if (aud) {
+                aud.play().then(() => { aud.pause(); }).catch(() => {});
+                unlockedAudioElements[`sound${g}${t}`] = aud;
+            }
+        });
+    });
+
+    startGame(); 
+}
 
 window.abortGame = () => {
     if (confirm("お稽古を中断してメニューに戻りますか？")) {
@@ -828,18 +849,26 @@ function startGame() {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     
     if (bgmAudio) { bgmAudio.pause(); }
+    
+    // 📱 iPhone対策：BGMオブジェクトも、ボタンをタップしたこの瞬間の流れの中で生成・即再生する
     bgmAudio = new Audio(bgmUrls[selectedKyoku]);
     bgmAudio.preload = "auto";
     
-    bgmAudio.addEventListener('canplaythrough', () => {
-        setTimeout(() => { if(isPlaying) return; bgmAudio.play(); startTime = performance.now(); isPlaying = true; gameLoop(); }, 1000);
-    }, { once: true });
-    bgmAudio.addEventListener('error', () => {
-        startTime = performance.now(); isPlaying = true; gameLoop();
-    }, { once: true });
+    // 💡 setTimeoutを排除し、iPhoneが「タップからの地続き処理」と認識できる形で即座に再生待機させます
+    bgmAudio.play().then(() => {
+        // 再生が成功したら、そこを基準点としてゲームスタート！
+        startTime = performance.now(); 
+        isPlaying = true; 
+        gameLoop();
+    }).catch(err => {
+        // 万が一自動再生が引っかかった場合のバックアップ処理
+        console.log("BGM再生失敗、1秒後に再試行", err);
+        setTimeout(() => { bgmAudio.play(); startTime = performance.now(); isPlaying = true; gameLoop(); }, 1000);
+    });
 }
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
 function playSynthSound(type) {
     let targetAudioId = "";
 
@@ -851,14 +880,18 @@ function playSynthSound(type) {
         targetAudioId = `soundKane${type}`;
     }
 
+    // 🔇 iPhone対策や音を鳴らす処理を丸ごとストップ（コメントアウト）しました
+    /*
     if (targetAudioId) {
-        const audioFile = document.getElementById(targetAudioId);
+        const audioFile = unlockedAudioElements[targetAudioId] || document.getElementById(targetAudioId);
         if (audioFile) {
-            audioFile.currentTime = 0;
-            audioFile.play().catch(err => console.log("再生エラー:", err));
+            const clone = audioFile.cloneNode();
+            clone.play().catch(err => console.log("再生エラー:", err));
         }
     }
+    */
 
+    // ✨ 画面上のビジュアルアニメーション連動（光るエフェクト）は残します
     if (selectedGakki === "大太鼓" || selectedGakki === "〆太鼓") {
         const taikoPart = document.getElementById(`taikoPart${type}`);
         if (taikoPart) {
